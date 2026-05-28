@@ -1,0 +1,14 @@
+{
+  "name": "@tractor/shared",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.ts",
+  "types": "index.ts",
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "devDependencies": {
+    "typescript": "^6.0.3"
+  }
+}
