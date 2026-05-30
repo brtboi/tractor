@@ -1,11 +1,15 @@
 {
-  "name": "card-game",
+  "name": "@tractor/game",
   "private": true,
   "workspaces": [
     "shared",
     "server",
     "client"
   ],
+  "scripts": {
+    "build": "npm run build -w @tractor/shared && npm run build -w @tractor/server",
+    "dev": "npm run dev -w @tractor/shared & npm run dev -w @tractor/server"
+  },
   "devDependencies": {
     "typescript": "^6.0.3"
   }

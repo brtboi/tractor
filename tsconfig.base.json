@@ -6,7 +6,7 @@
     "declaration": true,
     "skipLibCheck": true,
     "paths": {
-      "@shared/*": ["./shared/*"]
+      "@tractor/shared/*": ["./shared/*"]
     }
   }
 }

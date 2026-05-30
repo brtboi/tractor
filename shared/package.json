@@ -1,14 +1,17 @@
 {
   "name": "@tractor/shared",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.ts",
-  "types": "index.ts",
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "private": true,
   "type": "module",
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch"
+  },
   "devDependencies": {
-    "typescript": "^6.0.3"
+    "typescript": "^5.0.0"
   }
 }
