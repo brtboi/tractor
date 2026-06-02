@@ -40,7 +40,7 @@ export type Team = {
 };
 
 export type TrickSequence = {
-  numberCards: number;
+  numCards: number;
   highestRank: number;
 }[];
 

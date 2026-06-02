@@ -128,7 +128,7 @@ function getTrickSuit(
 /**
  * From card[] to array of (number of cards, rank) for each set of consecutive pairs.
  * Assumes trick is sorted by canonical rank.
- * @example [22 33 44 77 A] -> [{numberCards: 6, highestRank: 4}, {numberCards: 2, highestRank: 7}, {numberCards: 1, highestRank: 14}]
+ * @example [22 33 44 77 A] -> [{numCards: 6, highestRank: 4}, {numCards: 2, highestRank: 7}, {numCards: 1, highestRank: 14}]
  * @param trick
  * @param trumpSuit
  * @param trumpRank
@@ -151,7 +151,7 @@ function getTrickSequence(
       getCanonicalRank(trick[i + 1], trumpSuit, trumpRank) !== currentRank
     ) {
       degreeSequence.push({
-        numberCards: 1,
+        numCards: 1,
         highestRank: currentRank,
       });
 
@@ -177,7 +177,7 @@ function getTrickSequence(
       }
 
       degreeSequence.push({
-        numberCards: 2 * numConsecutivePairs,
+        numCards: 2 * numConsecutivePairs,
         highestRank: currentRank + numConsecutivePairs - 1,
       });
 
@@ -187,65 +187,77 @@ function getTrickSequence(
   return degreeSequence;
 }
 
+/**
+ * returns list of all possible downgrade sequences from trickSequence to targetSequence.
+ * @param trickSequence
+ * @param targetSequence
+ * @param allDowngrades
+ * @returns
+ */
 function generateDowngrades(
   trickSequence: TrickSequence,
   targetSequence: TrickSequence,
   allDowngrades: TrickSequence[] = [],
 ): TrickSequence[] {
   if (
-    trickSequence.reduce((sum, { numberCards }) => sum + numberCards, 0) !==
-    targetSequence.reduce((sum, { numberCards }) => sum + numberCards, 0)
+    trickSequence.reduce((sum, { numCards }) => sum + numCards, 0) !==
+    targetSequence.reduce((sum, { numCards }) => sum + numCards, 0)
   ) {
     throw new Error("Can only compare tricks of the same length");
   }
 
   // sort by number of cards descending
-  trickSequence.sort((a, b) => b.numberCards - a.numberCards);
-  targetSequence.sort((a, b) => b.numberCards - a.numberCards);
+  trickSequence.sort((a, b) => b.numCards - a.numCards);
+  targetSequence.sort((a, b) => b.numCards - a.numCards);
 
-  const trickMaxCards = trickSequence[0].numberCards;
-  const targetMaxCards = targetSequence[0].numberCards;
+  const trickMaxnumCards = trickSequence[0].numCards;
+  const targetMaxnumCards = targetSequence[0].numCards;
 
   // found valid downgrade sequence
   if (
     trickSequence.every(
-      ({ numberCards }, i) => numberCards === targetSequence[i].numberCards,
+      ({ numCards }, i) => numCards === targetSequence[i].numCards,
     )
   )
     allDowngrades.push(trickSequence);
   // if trick has fewer cards in highest set than target, can't downgrade
-  else if (trickMaxCards < targetMaxCards) return [];
+  else if (trickMaxnumCards < targetMaxnumCards) return [];
 
   // if both reduced to only singles (max for both is 1) and different lengths, can't downgrade
   if (
-    trickMaxCards === 1 &&
-    targetMaxCards === 1 &&
+    trickMaxnumCards === 1 &&
+    targetMaxnumCards === 1 &&
     trickSequence.length !== targetSequence.length
   )
     return [];
 
   // if trick and target have same number of cards in highest set, downgrade rest of sets
-  if (trickMaxCards === targetMaxCards)
+  if (trickMaxnumCards === targetMaxnumCards)
     return generateDowngrades(
       trickSequence.slice(1),
       targetSequence.slice(1),
     ).map((downgrade) => [trickSequence[0], ...downgrade]);
 
-  if (targetMaxCards === 1 && trickMaxCards !== 1)
+  // if target is singles but trick is not, can downgrade
+  if (targetMaxnumCards === 1 && trickMaxnumCards !== 1)
     return generateDowngrades(
       [
         {
-          numberCards: 1,
+          numCards: 1,
           highestRank: trickSequence[0].highestRank,
         },
         {
-          numberCards: 1,
+          numCards: 1,
           highestRank: trickSequence[0].highestRank,
         },
-        {
-          numberCards: trickSequence[0].numberCards - 2,
-          highestRank: trickSequence[0].highestRank - 1,
-        },
+        ...(trickMaxnumCards - 2 === 0
+          ? []
+          : [
+              {
+                numCards: trickMaxnumCards - 2,
+                highestRank: trickSequence[0].highestRank - 1,
+              },
+            ]),
         ...trickSequence.slice(1),
       ],
       targetSequence,
@@ -253,18 +265,18 @@ function generateDowngrades(
       generateDowngrades(
         [
           {
-            numberCards: trickSequence[0].numberCards - 2,
+            numCards: trickSequence[0].numCards - 2,
             highestRank: trickSequence[0].highestRank,
           },
           {
-            numberCards: 1,
+            numCards: 1,
             highestRank:
-              trickSequence[0].highestRank - trickSequence[0].numberCards + 2,
+              trickSequence[0].highestRank - trickSequence[0].numCards + 2,
           },
           {
-            numberCards: 1,
+            numCards: 1,
             highestRank:
-              trickSequence[0].highestRank - trickSequence[0].numberCards + 2,
+              trickSequence[0].highestRank - trickSequence[0].numCards + 2,
           },
           ...trickSequence.slice(1),
         ],
@@ -275,11 +287,11 @@ function generateDowngrades(
   return generateDowngrades(
     [
       {
-        numberCards: 2,
+        numCards: 2,
         highestRank: trickSequence[0].highestRank,
       },
       {
-        numberCards: trickSequence[0].numberCards - 2,
+        numCards: trickSequence[0].numCards - 2,
         highestRank: trickSequence[0].highestRank - 1,
       },
       ...trickSequence.slice(1),
@@ -289,13 +301,13 @@ function generateDowngrades(
     generateDowngrades(
       [
         {
-          numberCards: trickSequence[0].numberCards - 2,
+          numCards: trickSequence[0].numCards - 2,
           highestRank: trickSequence[0].highestRank,
         },
         {
-          numberCards: 2,
+          numCards: 2,
           highestRank:
-            trickSequence[0].highestRank - trickSequence[0].numberCards + 2,
+            trickSequence[0].highestRank - trickSequence[0].numCards + 2,
         },
         ...trickSequence.slice(1),
       ],
