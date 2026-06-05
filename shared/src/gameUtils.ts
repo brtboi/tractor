@@ -188,138 +188,131 @@ function getTrickSequence(
 }
 
 /**
- * returns list of all possible downgrade sequences from trickSequence to targetSequence.
- * @param trickSequence
- * @param targetSequence
- * @param allDowngrades
- * @returns
+ * All ways to split a run of `length` pairs (with highestRank) into contiguous sub-runs.
+ * A "run" of length 1 is just a pair.
+ * Returns array of TrickSequence (each is a list of groups from one split).
  */
-function generateDowngrades(
-  trickSequence: TrickSequence,
-  targetSequence: TrickSequence,
-  allDowngrades: TrickSequence[] = [],
-): TrickSequence[] {
-  if (
-    trickSequence.reduce((sum, { numCards }) => sum + numCards, 0) !==
-    targetSequence.reduce((sum, { numCards }) => sum + numCards, 0)
-  ) {
-    throw new Error("Can only compare tricks of the same length");
+function splitRun(length: number, highestRank: number): TrickSequence[] {
+  if (length === 1) {
+    // a pair: can stay as pair or split into two singles
+    return [
+      [{ numCards: 2, highestRank }],
+      [
+        { numCards: 1, highestRank },
+        { numCards: 1, highestRank: highestRank },
+      ],
+    ];
   }
 
-  // sort by number of cards descending
-  trickSequence.sort((a, b) => b.numCards - a.numCards);
-  targetSequence.sort((a, b) => b.numCards - a.numCards);
+  // A run of `length` covers canonical ranks: (highestRank - length + 1) ... highestRank
+  // Split into two contiguous sub-runs at every possible cut point
+  const results: TrickSequence[] = [];
 
-  const trickMaxnumCards = trickSequence[0].numCards;
-  const targetMaxnumCards = targetSequence[0].numCards;
+  // No split: keep as-is
+  results.push([{ numCards: length * 2, highestRank }]);
 
-  // found valid downgrade sequence
-  if (
-    trickSequence.every(
-      ({ numCards }, i) => numCards === targetSequence[i].numCards,
-    )
-  )
-    allDowngrades.push(trickSequence);
-  // if trick has fewer cards in highest set than target, can't downgrade
-  else if (trickMaxnumCards < targetMaxnumCards) return [];
+  // Split at cut: left sub-run has ranks (lowestRank)..(lowestRank + leftLen - 1), right has the rest
+  const lowestRank = highestRank - length + 1;
+  for (let leftLen = 1; leftLen < length; leftLen++) {
+    const rightLen = length - leftLen;
+    const leftHighest = lowestRank + leftLen - 1;
+    const rightHighest = highestRank;
 
-  // if both reduced to only singles (max for both is 1) and different lengths, can't downgrade
-  if (
-    trickMaxnumCards === 1 &&
-    targetMaxnumCards === 1 &&
-    trickSequence.length !== targetSequence.length
-  )
-    return [];
+    const leftSplits = splitRun(leftLen, leftHighest);
+    const rightSplits = splitRun(rightLen, rightHighest);
 
-  // if trick and target have same number of cards in highest set, downgrade rest of sets
-  if (trickMaxnumCards === targetMaxnumCards)
-    return generateDowngrades(
-      trickSequence.slice(1),
-      targetSequence.slice(1),
-    ).map((downgrade) => [trickSequence[0], ...downgrade]);
+    for (const left of leftSplits) {
+      for (const right of rightSplits) {
+        results.push([...left, ...right]);
+      }
+    }
+  }
 
-  // if target is singles but trick is not, can downgrade
-  if (targetMaxnumCards === 1 && trickMaxnumCards !== 1)
-    return generateDowngrades(
-      [
-        {
-          numCards: 1,
-          highestRank: trickSequence[0].highestRank,
-        },
-        {
-          numCards: 1,
-          highestRank: trickSequence[0].highestRank,
-        },
-        ...(trickMaxnumCards - 2 === 0
-          ? []
-          : [
-              {
-                numCards: trickMaxnumCards - 2,
-                highestRank: trickSequence[0].highestRank - 1,
-              },
-            ]),
-        ...trickSequence.slice(1),
-      ],
-      targetSequence,
-    ).concat(
-      generateDowngrades(
-        [
-          {
-            numCards: trickSequence[0].numCards - 2,
-            highestRank: trickSequence[0].highestRank,
-          },
-          {
-            numCards: 1,
-            highestRank:
-              trickSequence[0].highestRank - trickSequence[0].numCards + 2,
-          },
-          {
-            numCards: 1,
-            highestRank:
-              trickSequence[0].highestRank - trickSequence[0].numCards + 2,
-          },
-          ...trickSequence.slice(1),
-        ],
-        targetSequence,
-      ),
-    );
-
-  return generateDowngrades(
-    [
-      {
-        numCards: 2,
-        highestRank: trickSequence[0].highestRank,
-      },
-      {
-        numCards: trickSequence[0].numCards - 2,
-        highestRank: trickSequence[0].highestRank - 1,
-      },
-      ...trickSequence.slice(1),
-    ],
-    targetSequence,
-  ).concat(
-    generateDowngrades(
-      [
-        {
-          numCards: trickSequence[0].numCards - 2,
-          highestRank: trickSequence[0].highestRank,
-        },
-        {
-          numCards: 2,
-          highestRank:
-            trickSequence[0].highestRank - trickSequence[0].numCards + 2,
-        },
-        ...trickSequence.slice(1),
-      ],
-      targetSequence,
-    ),
-  );
+  return results;
 }
 
 /**
- * Assumes a was played before b. Returns positive number if a wins, negative if b wins
- * @param a current winning cards of trick. Assumed to be suited and valid
+ * Generate all decompositions of a TrickSequence.
+ * Each group in the sequence is independently split, and we take the cartesian product.
  */
+function generateDecompositions(sequence: TrickSequence): TrickSequence[] {
+  if (sequence.length === 0) return [[]];
+
+  const [first, ...rest] = sequence;
+  const restDecompositions = generateDecompositions(rest);
+
+  let firstSplits: TrickSequence[];
+  if (first.numCards === 1) {
+    // singles can't be split further
+    firstSplits = [[first]];
+  } else {
+    // numCards is always even for runs/pairs; length in pairs = numCards / 2
+    firstSplits = splitRun(first.numCards / 2, first.highestRank);
+  }
+
+  const results: TrickSequence[] = [];
+  for (const split of firstSplits) {
+    for (const restDecomp of restDecompositions) {
+      results.push([...split, ...restDecomp]);
+    }
+  }
+  return results;
+}
+
+/**
+ * Check if decomposition `bDecomp` beats `aSeq` via some bijection:
+ * for every group in aSeq, there exists a group in bDecomp with same numCards and strictly higher rank.
+ * Uses greedy matching (works because we just need existence of a perfect matching).
+ */
+function decompositionBeats(
+  bDecomp: TrickSequence,
+  aSeq: TrickSequence,
+): boolean {
+  if (bDecomp.length !== aSeq.length) return false;
+
+  // Group by numCards, then check if every a-group has a b-group with higher rank
+  // Use a greedy: for each a-group, find the lowest-rank b-group that beats it
+  const bBySize = new Map<number, number[]>();
+  for (const group of bDecomp) {
+    if (!bBySize.has(group.numCards))
+      bBySize.set(group.numCards, []);
+    bBySize.get(group.numCards)!.push(group.highestRank);
+  }
+  
+  // Sort each size bucket ascending so we use the smallest sufficient rank
+  for (const ranks of bBySize.values()) ranks.sort((x, y) => x - y);
+
+  const aBySize = new Map<number, number[]>();
+  for (const group of aSeq) {
+    if (!aBySize.has(group.numCards)) aBySize.set(group.numCards, []);
+    aBySize.get(group.numCards)!.push(group.highestRank);
+  }
+
+  for (const [size, aRanks] of aBySize.entries()) {
+    const bRanks = bBySize.get(size);
+    if (!bRanks || bRanks.length < aRanks.length) return false;
+
+    // Sort a ascending, greedily match each a to smallest b that beats it
+    const sortedA = [...aRanks].sort((x, y) => x - y);
+    const usedB = new Set<number>(); // indices into bRanks
+
+    for (const aRank of sortedA) {
+      // Find smallest bRank > aRank not yet used
+      let matched = false;
+      for (let i = 0; i < bRanks.length; i++) {
+        if (!usedB.has(i) && bRanks[i] > aRank) {
+          usedB.add(i);
+          matched = true;
+          break;
+        }
+      }
+      if (!matched) return false;
+    }
+  }
+
+  return true;
+}
+
 export function compareTricks(
   a: Card[],
   b: Card[],
@@ -334,7 +327,24 @@ export function compareTricks(
   const aSuit = getTrickSuit(a, trumpSuit, trumpRank);
   const bSuit = getTrickSuit(b, trumpSuit, trumpRank);
 
+  // b is not suited or doesn't follow lead suit/trump: a wins
   if (!bSuit) return 1;
   if (bSuit !== startSuit && bSuit !== "Joker") return 1;
+
+  // a is non-trump, b is trump: b wins
+  if (aSuit !== "Joker" && bSuit === "Joker") return -1;
+
+  // a is trump, b is not: a wins
   if (aSuit === "Joker" && bSuit !== "Joker") return 1;
+
+  // Both same suit: compare by decomposition
+  const aSeq = getTrickSequence(a, trumpSuit, trumpRank);
+  const bSeq = getTrickSequence(b, trumpSuit, trumpRank);
+  const bDecompositions = generateDecompositions(bSeq);
+
+  for (const bDecomp of bDecompositions) {
+    if (decompositionBeats(bDecomp, aSeq)) return -1; // b wins
+  }
+
+  return 1; // a wins
 }
