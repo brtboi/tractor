@@ -36,7 +36,7 @@ io.on("connection", (socket) => {
     const roomId = Math.random().toString(36).slice(2, 7).toUpperCase();
     rooms[roomId] = createRoom(roomId);
     rooms[roomId] = addPlayer(rooms[roomId], socket.id, name);
-    
+
     socket.join(roomId);
     socket.emit("room_created", { roomId });
     broadcastState(roomId);
@@ -69,25 +69,23 @@ io.on("connection", (socket) => {
     }
   });
 
+  // Test game
+  socket.on("start_test_game", ({ roomId }: { roomId: string }) => {
+    try {
+      rooms[roomId] = startTestGame(rooms[roomId]);
+      broadcastState(roomId);
+    } catch (e: any) {
+      socket.emit("error", e.message);
+    }
+  });
+
   // Player plays a card
   socket.on(
     "play_trick",
     ({ roomId, trick }: { roomId: string; trick: Card[] }) => {
       try {
         rooms[roomId] = playTrick(rooms[roomId], socket.id, trick);
-        const currentTricks = rooms[roomId].currentRound?.currentTricks;
-
-        if (trick.length === 4) {
-          // Trick complete — for now, first player wins (plug in real logic here)
-          const winnerId = trick[0].playerId;
-          broadcastState(roomId); // show completed trick first
-          setTimeout(() => {
-            rooms[roomId] = clearTrick(rooms[roomId], winnerId);
-            broadcastState(roomId);
-          }, 2000); // 2s pause so players can see the trick
-        } else {
-          broadcastState(roomId);
-        }
+        broadcastState(roomId);
       } catch (e: any) {
         socket.emit("error", e.message);
       }
