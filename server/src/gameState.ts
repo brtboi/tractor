@@ -1,4 +1,11 @@
-import { Suit, Card, GameState, Rank } from "@tractor/shared";
+import {
+  Suit,
+  Card,
+  GameState,
+  Rank,
+  isPoint,
+  compareTricks,
+} from "@tractor/shared";
 
 export function createRoom(roomId: string): GameState {
   return {
@@ -37,7 +44,10 @@ export function addPlayer(
   return {
     ...state,
     playerOrder: [...state.playerOrder, playerId],
-    players: { ...state.players, [playerId]: { id: playerId, name: playerName } },
+    players: {
+      ...state.players,
+      [playerId]: { id: playerId, name: playerName },
+    },
   };
 }
 
@@ -92,10 +102,7 @@ export function startTestGame(prev: GameState): GameState {
 
   const playerIds = prev.playerOrder;
 
-  const hands = testDeal(
-    2,
-    playerIds,
-  );
+  const hands = testDeal(2, playerIds);
 
   return {
     ...prev,
@@ -123,10 +130,9 @@ export function startTestGame(prev: GameState): GameState {
       trumpSuit: "Spades",
       trumpRank: 2,
       currentTurn: playerIds[0],
-      currentTrick: [],
+      currentTricks: [],
       hands,
-      discards: prev.playerOrder.reduce((acc, id) => ({ ...acc, [id]: [] }), {}),
-      topDiscardedTrick: prev.playerOrder.reduce(
+      discards: prev.playerOrder.reduce(
         (acc, id) => ({ ...acc, [id]: [] }),
         {},
       ),
@@ -134,6 +140,10 @@ export function startTestGame(prev: GameState): GameState {
       bottom: [],
     },
   };
+}
+
+export function startGame(prev: GameState): GameState {
+  throw new Error("Not implemented yet");
 }
 
 export function playCard(
@@ -147,60 +157,86 @@ export function playCard(
   const prevRound = prev.currentRound;
 
   if (prevRound.currentTurn !== playerId) throw new Error("Not your turn");
+  if (!prevRound.trumpSuit) throw new Error("Trump not set");
+
   if (cards.some((card) => !prevRound.hands[playerId].includes(card)))
     throw new Error("Card not in hand");
 
-  const newTrick = [...prevRound.currentTrick, { playerId, cards }];
+  const newCurrentTricks = [
+    ...prevRound.currentTricks,
+    { playerId, trick: cards },
+  ];
   const newHand = prevRound.hands[playerId].filter(
     (card) => !cards.includes(card),
   );
-  const newDiscards = [...prevRound.discards[playerId], ...cards];
-  const newTopDiscardedTrick = {
-    ...prevRound.topDiscardedTrick,
-    [playerId]: cards,
-  };
-  const newCurrentTurn = (prev.playerOrder.indexOf(playerId) + 1) % prev.playerOrder.length;
+  const newDiscards = prevRound.discards;
+  const newPoints = prevRound.points;
+  let newCurrentTurn =
+    (prev.playerOrder.indexOf(playerId) + 1) % prev.playerOrder.length;
 
   // next Trick: find winner & updates points
-  if (newTrick.length >= prev.playerOrder.length) {
+  if (newCurrentTricks.length >= prev.playerOrder.length) {
+    // find winning trick
     let winnerIndex = 0;
-    for (let i = 1; i < newTrick.length; i++) {
+    for (let i = 1; i < newCurrentTricks.length; i++) {
+      if (
+        compareTricks(
+          newCurrentTricks[i].trick,
+          newCurrentTricks[winnerIndex].trick,
+          newCurrentTricks[0].trick,
+          prevRound.trumpSuit,
+          prevRound.trumpRank,
+        ) > 0
+      )
+        winnerIndex = i;
+    }
+    // winner plays first next trick
+    newCurrentTurn = prev.playerOrder.indexOf(
+      newCurrentTricks[winnerIndex].playerId,
+    );
+
+    // update discards and points
+    const winningTeam = prev.teams.find((team) =>
+      team.playerIds.includes(newCurrentTricks[winnerIndex].playerId),
+    )!;
+
+    for (const { playerId, trick } of newCurrentTricks) {
+      if (winningTeam.id === prevRound.onTeam) {
+        // onTeam won: all cards are discards
+        newDiscards[playerId] = [...newDiscards[playerId], trick];
+      } else {
+        // offTeam won: split each trick into points and discards
+        const points:  Card[] = [];
+        const discard: Card[] = [];
+
+        for (const card of trick) {
+          if (isPoint(card)) points.push(card);
+          else               discard.push(card);
+        }
+
+        newPoints.push(...points);
+        newDiscards[playerId] = [...newDiscards[playerId], discard];
+      }
+    }
   }
 
-
-
-
-
-
-  return {
-    ...prev,
-
-  };
-}
-
-export function nextTrick(prev: GameState): GameState {
   return {
     ...prev,
     currentRound: {
-      ...prev.currentRound,
-      currentTurn: ...
-      currentTrick: {
-        currentTurn: prev.currentRound?.currentTrick.winner?.playerId ?? prev.playerOrder[0],
-        winner: null,
-        plays: [],
-        points: [],
+      ...prevRound,
+      currentTurn: prev.playerOrder[newCurrentTurn],
+      currentTricks: newCurrentTricks,
+      hands: {
+        ...prevRound.hands,
+        [playerId]: newHand,
       },
+      discards: newDiscards,
+      points: newPoints,
     },
   };
 }
 
-// Filter state so a player only sees their own hand
+// WIP: Filter state so a player only sees their own hand
 export function stateForPlayer(state: GameState, playerId: string) {
-  return {
-    ...state,
-    players: state.players.map((p) => ({
-      ...p,
-      hand: p.id === playerId ? p.hand : `(${p.hand.length} cards)`,
-    })),
-  };
+  return state;
 }
