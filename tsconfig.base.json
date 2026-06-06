@@ -4,9 +4,6 @@
     "strict": true,
     "esModuleInterop": true,
     "declaration": true,
-    "skipLibCheck": true,
-    "paths": {
-      "@tractor/shared/*": ["./shared/*"]
-    }
+    "skipLibCheck": true
   }
 }

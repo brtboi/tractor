@@ -49,12 +49,11 @@ export type RoundState = {
   trumpSuit: Suit | null; // "Joker" for no trump
   trumpRank: number;
 
-  currentTurn: string
+  currentTurn: string // playerId
   currentTricks: {playerId: string; trick: Card[]}[];
 
   hands: Record<string, Card[]>; // player ID -> hand
-  discards: Record<string, Card[]>; // player ID -> discarded cards
-  topDiscardedTrick: Record<string, Card[]>; // player ID -> top discarded trick (for display)
+  discards: Record<string, Card[][]>; // player ID -> discarded cards by trick
   points: Card[]; // cards won by off team
   bottom: Card[]; // cards on the bottom
 };

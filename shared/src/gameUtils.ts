@@ -6,6 +6,14 @@ function isTrump(card: Card, trumpSuit: Suit, trumpRank: number): boolean {
   );
 }
 
+export function isPoint(card: Card): boolean {
+  return (
+    card.rank === 5 ||
+    card.rank === 10 ||
+    card.rank === 13
+  );
+}
+
 /**
  * returns canonical/absolute rank of a card
  * Trump: small trump 502-513 (skip trump rank), trump rank 514, 515, jokers 516, 517.
@@ -75,55 +83,6 @@ function getTrickSuit(
 
   return null;
 }
-
-// function getTrickDegreeSequence(
-//   trick: Card[],
-//   trumpSuit: Suit,
-//   trumpRank: number,
-// ): TrickDegree[] {
-//   if (!getTrickSuit(trick, trumpSuit, trumpRank))
-//     return [];
-
-//   const rankCounts: number[] = [];
-//   trick.forEach((card) => {
-//     const rank = getCanonicalRank(card, trumpSuit, trumpRank);
-//     rankCounts[rank] = (rankCounts[rank] ?? 0) + 1;
-//   });
-
-//   // let pairSequence: number[] = [];
-//   // let numSingles = 0;
-
-//   // let highestPairs: number[] = [];
-//   // let highestSingle = 0;
-//   // let i = 0;
-
-//   // while (i < rankCounts.length) {
-//   //   if (rankCounts[i] === 1) {
-//   //     numSingles++;
-//   //     highestSingle = i;
-//   //   } else if (rankCounts[i] === 2) {
-//   //     let numConsecuivePairs = 1;
-
-//   //     while (i + 1 < rankCounts.length && rankCounts[i + 1] === 2) {
-//   //       numConsecuivePairs++;
-//   //       i++;
-//   //     }
-
-//   //     pairSequence.push(numConsecuivePairs);
-//   //     highestPairs.push(i);
-//   //   } else {
-//   //     throw new Error(`Invalid trick with rank ${i} count ${rankCounts[i]}`);
-//   //   }
-
-//   //   i++;
-//   // }
-//   return {
-//     pairSequence,
-//     numSingles,
-//     highestPairs,
-//     highestSingle,
-//   };
-// }
 
 /**
  * From card[] to array of (number of cards, rank) for each set of consecutive pairs.
