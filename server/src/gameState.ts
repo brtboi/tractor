@@ -146,10 +146,10 @@ export function startGame(prev: GameState): GameState {
   throw new Error("Not implemented yet");
 }
 
-export function playCard(
+export function playTrick(
   prev: GameState,
   playerId: string,
-  cards: Card[],
+  trick: Card[],
 ): GameState {
   if (prev.phase !== "playing") throw new Error("Game not in progress");
   if (!prev.currentRound) throw new Error("No active round");
@@ -159,15 +159,15 @@ export function playCard(
   if (prevRound.currentTurn !== playerId) throw new Error("Not your turn");
   if (!prevRound.trumpSuit) throw new Error("Trump not set");
 
-  if (cards.some((card) => !prevRound.hands[playerId].includes(card)))
+  if (trick.some((card) => !prevRound.hands[playerId].includes(card)))
     throw new Error("Card not in hand");
 
   const newCurrentTricks = [
     ...prevRound.currentTricks,
-    { playerId, trick: cards },
+    { playerId, trick: trick },
   ];
   const newHand = prevRound.hands[playerId].filter(
-    (card) => !cards.includes(card),
+    (card) => !trick.includes(card),
   );
   const newDiscards = prevRound.discards;
   const newPoints = prevRound.points;

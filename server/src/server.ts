@@ -1,14 +1,14 @@
 import express from "express";
 import { createServer } from "http";
 import { Server } from "socket.io";
-import { GameState, Card } from "@shared/gameTypes.js";
+import { Card, GameState } from "@tractor/shared";
 import {
   createRoom,
   addPlayer,
   startGame,
-  playCard,
-  clearTrick,
+  startTestGame,
   stateForPlayer,
+  playTrick,
 } from "./gameState.js";
 
 const app = express();
@@ -23,8 +23,8 @@ const rooms: Record<string, GameState> = {};
 function broadcastState(roomId: string) {
   const state = rooms[roomId];
   // Each player gets a version with only their hand visible
-  state.players.forEach((player) => {
-    io.to(player.id).emit("game_state", stateForPlayer(state, player.id));
+  Object.entries(state.players).forEach(([playerId, _player]) => {
+    io.to(playerId).emit("game_state", stateForPlayer(state, playerId));
   });
 }
 
@@ -36,6 +36,7 @@ io.on("connection", (socket) => {
     const roomId = Math.random().toString(36).slice(2, 7).toUpperCase();
     rooms[roomId] = createRoom(roomId);
     rooms[roomId] = addPlayer(rooms[roomId], socket.id, name);
+    
     socket.join(roomId);
     socket.emit("room_created", { roomId });
     broadcastState(roomId);
@@ -70,11 +71,11 @@ io.on("connection", (socket) => {
 
   // Player plays a card
   socket.on(
-    "play_card",
-    ({ roomId, card }: { roomId: string; card: string }) => {
+    "play_trick",
+    ({ roomId, trick }: { roomId: string; trick: Card[] }) => {
       try {
-        rooms[roomId] = playCard(rooms[roomId], socket.id, card);
-        const trick = rooms[roomId].currentTrick;
+        rooms[roomId] = playTrick(rooms[roomId], socket.id, trick);
+        const currentTricks = rooms[roomId].currentRound?.currentTricks;
 
         if (trick.length === 4) {
           // Trick complete — for now, first player wins (plug in real logic here)
