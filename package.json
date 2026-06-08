@@ -8,7 +8,7 @@
   ],
   "scripts": {
     "build": "npm run build -w @tractor/shared && npm run build -w @tractor/server",
-    "dev": "npm run dev -w @tractor/shared & npm run dev -w @tractor/server",
+    "dev": "npm run dev -w @tractor/shared && npm run dev -w @tractor/server",
     "dev:shared": "npm run dev -w @tractor/shared"
   },
   "devDependencies": {
