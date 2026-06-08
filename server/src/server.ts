@@ -1,7 +1,13 @@
 import express from "express";
 import { createServer } from "http";
 import { Server } from "socket.io";
-import { Card, GameState } from "@tractor/shared";
+import {
+  Card,
+  GameState,
+  ClientToServerEvents,
+  ServerToClientEvents,
+  ServerError,
+} from "@tractor/shared";
 import {
   createRoom,
   addPlayer,
@@ -13,7 +19,7 @@ import {
 
 const app = express();
 const httpServer = createServer(app);
-const io = new Server(httpServer, {
+const io = new Server<ClientToServerEvents, ServerToClientEvents>(httpServer, {
   cors: { origin: "*" }, // open for dev
 });
 
@@ -47,7 +53,7 @@ io.on("connection", (socket) => {
     "join_room",
     ({ roomId, name }: { roomId: string; name: string }) => {
       try {
-        if (!rooms[roomId]) throw new Error("Room not found");
+        if (!rooms[roomId]) throw new ServerError("ROOM_NOT_FOUND");
 
         rooms[roomId] = addPlayer(rooms[roomId], socket.id, name);
         socket.join(roomId);

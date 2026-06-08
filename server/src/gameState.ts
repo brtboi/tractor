@@ -5,6 +5,8 @@ import {
   Rank,
   isPoint,
   compareTricks,
+  ServerError,
+  ErrorCode,
 } from "@tractor/shared";
 
 export function createRoom(roomId: string): GameState {
@@ -39,7 +41,7 @@ export function addPlayer(
   playerId: string,
   playerName: string,
 ): GameState {
-  if (state.playerOrder.length >= 4) throw new Error("Room is full");
+  if (state.playerOrder.length >= 4) throw new ServerError("ROOM_FULL");
 
   return {
     ...state,
@@ -98,7 +100,11 @@ function testDeal(
 }
 
 export function startTestGame(prev: GameState): GameState {
-  if (prev.playerOrder.length !== 4) throw new Error("Need 4 players");
+  if (prev.playerOrder.length !== 4)
+    throw new ServerError(
+      "INVALID_NUM_PLAYERS",
+      `Need 4 players to start game, found ${prev.playerOrder.length}`,
+    );
 
   const playerIds = prev.playerOrder;
 
@@ -143,7 +149,7 @@ export function startTestGame(prev: GameState): GameState {
 }
 
 export function startGame(prev: GameState): GameState {
-  throw new Error("Not implemented yet");
+  throw new ServerError("FEATURE_NOT_IMPLEMENTED", "startGame not implemented, please use startTestGame");
 }
 
 export function playTrick(
@@ -151,16 +157,25 @@ export function playTrick(
   playerId: string,
   trick: Card[],
 ): GameState {
-  if (prev.phase !== "playing") throw new Error("Game not in progress");
-  if (!prev.currentRound) throw new Error("No active round");
+  if (prev.phase !== "playing")
+    throw new ServerError(
+      "GAME_NOT_IN_PROGRESS",
+      `Expected phase to be 'playing', found '${prev.phase}'`,
+    );
+  if (!prev.currentRound) throw new ServerError("NO_ACTIVE_ROUND");
 
   const prevRound = prev.currentRound;
 
-  if (prevRound.currentTurn !== playerId) throw new Error("Not your turn");
-  if (!prevRound.trumpSuit) throw new Error("Trump not set");
+  if (prevRound.currentTurn !== playerId)
+    throw new ServerError(
+      "NOT_YOUR_TURN",
+      `Expected turn to be ${prevRound.currentTurn}, found ${playerId}`,
+    );
+  if (!prevRound.trumpSuit)
+    throw new ServerError("INVALID_TRICK", "Trump not set");
 
   if (trick.some((card) => !prevRound.hands[playerId].includes(card)))
-    throw new Error("Card not in hand");
+    throw new ServerError("INVALID_TRICK", `Card not in hand`);
 
   const newCurrentTricks = [
     ...prevRound.currentTricks,
@@ -206,12 +221,12 @@ export function playTrick(
         newDiscards[playerId] = [...newDiscards[playerId], trick];
       } else {
         // offTeam won: split each trick into points and discards
-        const points:  Card[] = [];
+        const points: Card[] = [];
         const discard: Card[] = [];
 
         for (const card of trick) {
           if (isPoint(card)) points.push(card);
-          else               discard.push(card);
+          else discard.push(card);
         }
 
         newPoints.push(...points);
