@@ -1,6 +1,8 @@
 {
-    "editor.formatOnSave": true,
-    "editor.defaultFormatter": "esbenp.prettier-vscode",
-    "editor.tabSize": 2,
-    "editor.formatOnPaste": true
+  "editor.formatOnSave": true,
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "editor.tabSize": 2,
+  "editor.formatOnPaste": true,
+  "todo-tree.general.showActivityBarBadge": true,
+  "todo-tree.ripgrep.ripgrep": "/usr/bin/rg"
 }
