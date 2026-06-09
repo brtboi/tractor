@@ -17,6 +17,8 @@ import {
   playTrick,
 } from "./gameState.js";
 
+// TODO: handle abandoned rooms
+
 const app = express();
 const httpServer = createServer(app);
 const io = new Server<ClientToServerEvents, ServerToClientEvents>(httpServer, {
