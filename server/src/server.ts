@@ -37,6 +37,7 @@ function broadcastState(roomId: string) {
 }
 
 io.on("connection", (socket) => {
+  socket.emit("CONNECTED", { playerId: socket.id });
   console.log("connected:", socket.id);
 
   // Create a new room
@@ -100,7 +101,7 @@ io.on("connection", (socket) => {
     },
   );
 
-  socket.on("disconnect", () => {
+  socket.on("DISCONNECT", () => {
     console.log("disconnected:", socket.id);
   });
 });

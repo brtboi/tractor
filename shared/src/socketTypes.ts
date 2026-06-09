@@ -9,10 +9,12 @@ export type ClientToServerEvents = {
   START_GAME: (payload: { roomId: string }) => void;
   START_TEST_GAME: (payload: { roomId: string }) => void;
   PLAY_TRICK: (payload: { roomId: string; trick: Card[] }) => void;
+  DISCONNECT: () => void;
 };
 
 // Server -> Client
 export type ServerToClientEvents = {
+  CONNECTED: (payload: { playerId: string }) => void;
   GAME_STATE: (state: GameState) => void;
   ROOM_CREATED: (payload: { roomId: string }) => void;
   PLAYER_JOINED: (payload: { name: string }) => void;
