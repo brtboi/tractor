@@ -22,7 +22,7 @@
     "noFallthroughCasesInSwitch": true,
 
     "paths": {
-      "@tractor/shared": ["../shared/dist/index.js"]
+      "@tractor/shared": ["../shared/dist/index.ts"]
     }
   },
   "include": ["src"]
