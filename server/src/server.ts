@@ -30,7 +30,7 @@ function broadcastState(roomId: string) {
   const state = rooms[roomId];
   // Each player gets a version with only their hand visible
   Object.entries(state.players).forEach(([playerId, _player]) => {
-    io.to(playerId).emit("game_state", stateForPlayer(state, playerId));
+    io.to(playerId).emit("GAME_STATE", stateForPlayer(state, playerId));
   });
 }
 
@@ -38,62 +38,62 @@ io.on("connection", (socket) => {
   console.log("connected:", socket.id);
 
   // Create a new room
-  socket.on("create_room", ({ name }: { name: string }) => {
+  socket.on("CREATE_ROOM", ({ name }: { name: string }) => {
     const roomId = Math.random().toString(36).slice(2, 7).toUpperCase();
     rooms[roomId] = createRoom(roomId);
     rooms[roomId] = addPlayer(rooms[roomId], socket.id, name);
 
     socket.join(roomId);
-    socket.emit("room_created", { roomId });
+    socket.emit("ROOM_CREATED", { roomId });
     broadcastState(roomId);
   });
 
   // Join an existing room
   socket.on(
-    "join_room",
+    "JOIN_ROOM",
     ({ roomId, name }: { roomId: string; name: string }) => {
       try {
         if (!rooms[roomId]) throw new ServerError("ROOM_NOT_FOUND");
 
         rooms[roomId] = addPlayer(rooms[roomId], socket.id, name);
         socket.join(roomId);
-        io.to(roomId).emit("player_joined", { name });
+        io.to(roomId).emit("PLAYER_JOINED", { name });
         broadcastState(roomId);
       } catch (e: any) {
-        socket.emit("error", e.message);
+        socket.emit("ERROR", e.message);
       }
     },
   );
 
   // Host starts the game
-  socket.on("start_game", ({ roomId }: { roomId: string }) => {
+  socket.on("START_GAME", ({ roomId }: { roomId: string }) => {
     try {
       rooms[roomId] = startGame(rooms[roomId]);
       broadcastState(roomId);
     } catch (e: any) {
-      socket.emit("error", e.message);
+      socket.emit("ERROR", e.message);
     }
   });
 
   // Test game
-  socket.on("start_test_game", ({ roomId }: { roomId: string }) => {
+  socket.on("START_TEST_GAME", ({ roomId }: { roomId: string }) => {
     try {
       rooms[roomId] = startTestGame(rooms[roomId]);
       broadcastState(roomId);
     } catch (e: any) {
-      socket.emit("error", e.message);
+      socket.emit("ERROR", e.message);
     }
   });
 
   // Player plays a card
   socket.on(
-    "play_trick",
+    "PLAY_TRICK",
     ({ roomId, trick }: { roomId: string; trick: Card[] }) => {
       try {
         rooms[roomId] = playTrick(rooms[roomId], socket.id, trick);
         broadcastState(roomId);
       } catch (e: any) {
-        socket.emit("error", e.message);
+        socket.emit("ERROR", e.message);
       }
     },
   );
