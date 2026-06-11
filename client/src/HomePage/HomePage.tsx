@@ -1,5 +1,6 @@
 import { useState } from "react";
 import styles from "./HomePage.module.scss";
+import { createRoom } from "../services/gameActions";
 
 export default function HomePage() {
 
@@ -15,10 +16,12 @@ export default function HomePage() {
       </div>
 
       <div className={styles.hostJoinContainer}>
-        <div className={styles.hostJoinDiv}>
+        <button className={styles.hostJoinDiv} onClick={() => {
+          createRoom();
+        }}>
           <p>Host Game</p>
 
-        </div>
+        </button>
         <div className={styles.hostJoinDiv}>
           <p>Join Game</p>
           <input

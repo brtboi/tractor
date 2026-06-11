@@ -2,7 +2,10 @@
 import type { Card } from "@tractor/shared";
 import socket from "./socket";
 
-export function createRoom(name: string) {
+/**
+ * @param name empty string by default -> server generated name
+ */
+export function createRoom(name: string = "") {
   socket.emit("CREATE_ROOM", { name });
 }
 
