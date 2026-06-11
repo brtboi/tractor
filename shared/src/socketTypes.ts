@@ -6,6 +6,7 @@ import { Card, GameState } from "./gameTypes.js";
 export type ClientToServerEvents = {
   CREATE_ROOM: (payload: { name: string }) => void;
   JOIN_ROOM: (payload: { roomId: string; name: string }) => void;
+  RENAME_PLAYER: (payload: { roomId: string; newName: string }) => void;
   START_GAME: (payload: { roomId: string }) => void;
   START_TEST_GAME: (payload: { roomId: string }) => void;
   PLAY_TRICK: (payload: { roomId: string; trick: Card[] }) => void;
@@ -35,6 +36,7 @@ export class ServerError extends Error {
 export type ErrorCode =
   | "FEATURE_NOT_IMPLEMENTED"
   | "ROOM_NOT_FOUND"
+  | "PLAYER_NOT_FOUND"
   | "INVALID_NUM_PLAYERS"
   | "ROOM_FULL"
   | "GAME_NOT_IN_PROGRESS"

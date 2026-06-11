@@ -15,6 +15,7 @@ import {
   startTestGame,
   stateForPlayer,
   playTrick,
+  renamePlayer,
 } from "./gameState.js";
 
 // TODO: handle abandoned rooms
@@ -44,7 +45,7 @@ io.on("connection", (socket) => {
   socket.on("CREATE_ROOM", ({ name }: { name: string }) => {
     const roomId = Math.random().toString(36).slice(2, 7).toUpperCase();
     rooms[roomId] = createRoom(roomId);
-    rooms[roomId] = addPlayer(rooms[roomId], socket.id, name);
+    rooms[roomId] = addPlayer(rooms[roomId], socket.id, name === "" ? socket.id : name);
 
     socket.join(roomId);
     socket.emit("ROOM_CREATED", { roomId });
@@ -58,7 +59,7 @@ io.on("connection", (socket) => {
       try {
         if (!rooms[roomId]) throw new ServerError("ROOM_NOT_FOUND");
 
-        rooms[roomId] = addPlayer(rooms[roomId], socket.id, name);
+        rooms[roomId] = addPlayer(rooms[roomId], socket.id, name === "" ? socket.id : name);
         socket.join(roomId);
         io.to(roomId).emit("PLAYER_JOINED", { name });
         broadcastState(roomId);
@@ -67,6 +68,17 @@ io.on("connection", (socket) => {
       }
     },
   );
+
+  socket.on("RENAME_PLAYER", ({ roomId, newName }: { roomId: string; newName: string }) => {
+    try {
+      if (!rooms[roomId]) throw new ServerError("ROOM_NOT_FOUND");
+
+      rooms[roomId] = renamePlayer(rooms[roomId], socket.id, newName === "" ? socket.id : newName);
+      broadcastState(roomId);
+    } catch (e: any) {
+      socket.emit("ERROR", e.message);
+    }
+  });
 
   // Host starts the game
   socket.on("START_GAME", ({ roomId }: { roomId: string }) => {

@@ -53,6 +53,18 @@ export function addPlayer(
   };
 }
 
+export function renamePlayer(state: GameState, playerId: string, newName: string): GameState {
+  if (!state.players[playerId]) throw new ServerError("PLAYER_NOT_FOUND");
+
+  return {
+    ...state,
+    players: {
+      ...state.players,
+      [playerId]: { ...state.players[playerId], name: newName },
+    },
+  };
+}
+
 function shuffleCards(deckCount: number): Card[] {
   const suits: Suit[] = ["Spades", "Hearts", "Diamonds", "Clubs"];
   const ranks: Rank[] = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14];
