@@ -1,0 +1,55 @@
+// TODO: find a font
+// TODO: light mode support
+
+:root {
+  --bg-color: #1e1e1e;
+  --secondary-bg-color: #434343;
+  --text-color: #d0d0d0;
+  --primary-color: #3fc679;
+
+  --font-main: "Inter", system-ui, -apple-system, sans-serif;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body, #root {
+  height: 100%;
+}
+
+body {
+  font-family: var(--font-main);
+  background-color: var(--bg-color);
+  color: var(--text-color);
+
+  -webkit-font-smoothing: antialiased;
+}
+
+img, picture, video, canvas, svg {
+  display: block;
+  max-width: 100%;
+}
+
+input,
+button,
+textarea,
+select {
+  margin: 0;
+  border: none;
+  padding: 0;
+
+  background: none;
+  color: inherit;
+  outline: none;
+  font: inherit;
+  font-size: 1.5rem;
+}
+
+p {
+  font-size: 1.5rem;
+}
