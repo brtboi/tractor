@@ -10,7 +10,8 @@
     "build": "npm run build -w @tractor/shared && npm run build -w @tractor/server",
     "dev:shared": "npm run dev -w @tractor/shared",
     "dev:server": "npm run dev -w @tractor/server",
-    "dev:client": "npm run dev -w @tractor/client"
+    "dev:client": "npm run dev -w @tractor/client",
+    "dev": "npm run dev:shared & npm run dev:server & npm run dev:client"
   },
   "devDependencies": {
     "typescript": "^6.0.3"
