@@ -4,12 +4,7 @@ import "./HomePage.sass";
 import HostModal from "./HostModal.tsx";
 import JoinModal from "./JoinModal.tsx";
 
-interface Props {
-  theme: "dark" | "light";
-  onToggleTheme: () => void;
-}
-
-export default function HomePage({ theme, onToggleTheme }: Props) {
+export default function HomePage() {
   const [nameInput, setNameInput] = useState("");
   const [showHost, setShowHost] = useState(false);
   const [showJoin, setShowJoin] = useState(false);
@@ -18,23 +13,7 @@ export default function HomePage({ theme, onToggleTheme }: Props) {
 
   return (
     <div className="home">
-      <header className="header">
-        <a className="header__wordmark" href="/">
-          <span className="header__suit">♠</span>
-          TRACTOR
-        </a>
-        <div className="header__actions">
-          <button
-            className="btn-icon"
-            onClick={onToggleTheme}
-            aria-label="Toggle theme"
-          >
-            {theme === "dark" ? "☀" : "☾"}
-          </button>
-        </div>
-      </header>
-
-      <main className="hero">
+      <div className="hero">
         <span className="hero__eyebrow">升级 · Sheng Ji</span>
         <h1 className="hero__title">
           Play <span>Tractor</span>
@@ -44,14 +23,13 @@ export default function HomePage({ theme, onToggleTheme }: Props) {
         </p>
 
         <div className="cards">
-          {/* Name card — required before hosting or joining */}
           <div className="card">
             <div className="card__icon" aria-hidden="true">
               ♟
             </div>
             <div className="card__title">Your name</div>
             <p className="card__desc">
-              Set your display name before joining or hosting a game.
+              Set your display name before joining or hosting.
             </p>
             <div className="card__body">
               <input
@@ -65,14 +43,13 @@ export default function HomePage({ theme, onToggleTheme }: Props) {
             </div>
           </div>
 
-          {/* Host card */}
           <div className="card">
             <div className="card__icon" aria-hidden="true">
               ♚
             </div>
             <div className="card__title">Host a game</div>
             <p className="card__desc">
-              Create a new room and share the code with three friends.
+              Create a room and share the code with three friends.
             </p>
             <div className="card__body">
               <button
@@ -85,14 +62,13 @@ export default function HomePage({ theme, onToggleTheme }: Props) {
             </div>
           </div>
 
-          {/* Join card */}
           <div className="card">
             <div className="card__icon" aria-hidden="true">
               ♜
             </div>
             <div className="card__title">Join a game</div>
             <p className="card__desc">
-              Enter a room code to join a friend's game.
+              Enter a room code to jump into a friend's game.
             </p>
             <div className="card__body">
               <button
@@ -105,7 +81,7 @@ export default function HomePage({ theme, onToggleTheme }: Props) {
             </div>
           </div>
         </div>
-      </main>
+      </div>
 
       {showHost && (
         <HostModal
@@ -113,7 +89,6 @@ export default function HomePage({ theme, onToggleTheme }: Props) {
           onClose={() => setShowHost(false)}
         />
       )}
-
       {showJoin && (
         <JoinModal
           playerName={nameInput.trim()}
