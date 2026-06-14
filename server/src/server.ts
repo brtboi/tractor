@@ -45,10 +45,14 @@ io.on("connection", (socket) => {
   socket.on("CREATE_ROOM", ({ name }: { name: string }) => {
     const roomId = Math.random().toString(36).slice(2, 7).toUpperCase();
     rooms[roomId] = createRoom(roomId);
-    rooms[roomId] = addPlayer(rooms[roomId], socket.id, name === "" ? socket.id : name);
+    rooms[roomId] = addPlayer(
+      rooms[roomId],
+      socket.id,
+      name === "" ? socket.id : name,
+    );
 
     socket.join(roomId);
-    socket.emit("ROOM_CREATED", { roomId });
+    socket.emit("ROOM_CREATED", { state: rooms[roomId] });
     broadcastState(roomId);
   });
 
@@ -58,10 +62,13 @@ io.on("connection", (socket) => {
     ({ roomId, name }: { roomId: string; name: string }) => {
       try {
         if (!rooms[roomId]) throw new ServerError("ROOM_NOT_FOUND");
+        name = name === "" ? socket.id : name;
 
-        rooms[roomId] = addPlayer(rooms[roomId], socket.id, name === "" ? socket.id : name);
+        rooms[roomId] = addPlayer(rooms[roomId], socket.id, name);
         socket.join(roomId);
-        io.to(roomId).emit("PLAYER_JOINED", { name });
+        
+        socket.emit("GAME_STATE", rooms[roomId]);
+        io.to(roomId).emit("PLAYER_JOINED", { state: rooms[roomId] });
         broadcastState(roomId);
       } catch (e: any) {
         socket.emit("ERROR", e.message);
@@ -69,16 +76,23 @@ io.on("connection", (socket) => {
     },
   );
 
-  socket.on("RENAME_PLAYER", ({ roomId, newName }: { roomId: string; newName: string }) => {
-    try {
-      if (!rooms[roomId]) throw new ServerError("ROOM_NOT_FOUND");
+  socket.on(
+    "RENAME_PLAYER",
+    ({ roomId, newName }: { roomId: string; newName: string }) => {
+      try {
+        if (!rooms[roomId]) throw new ServerError("ROOM_NOT_FOUND");
 
-      rooms[roomId] = renamePlayer(rooms[roomId], socket.id, newName === "" ? socket.id : newName);
-      broadcastState(roomId);
-    } catch (e: any) {
-      socket.emit("ERROR", e.message);
-    }
-  });
+        rooms[roomId] = renamePlayer(
+          rooms[roomId],
+          socket.id,
+          newName === "" ? socket.id : newName,
+        );
+        broadcastState(roomId);
+      } catch (e: any) {
+        socket.emit("ERROR", e.message);
+      }
+    },
+  );
 
   // Host starts the game
   socket.on("START_GAME", ({ roomId }: { roomId: string }) => {

@@ -17,8 +17,8 @@ export type ClientToServerEvents = {
 export type ServerToClientEvents = {
   CONNECTED: (payload: { playerId: string }) => void;
   GAME_STATE: (state: GameState) => void;
-  ROOM_CREATED: (payload: { roomId: string }) => void;
-  PLAYER_JOINED: (payload: { name: string }) => void;
+  ROOM_CREATED: (payload: { state: GameState }) => void;
+  PLAYER_JOINED: (payload: { state: GameState }) => void;
   ERROR: (message: string) => void;
 };
 
