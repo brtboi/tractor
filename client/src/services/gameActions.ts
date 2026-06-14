@@ -9,7 +9,7 @@ export function createRoom(name: string = "") {
   socket.emit("CREATE_ROOM", { name });
 }
 
-export function joinRoom(roomId: string, name: string) {
+export function joinRoom(roomId: string, name: string = "") {
   socket.emit("JOIN_ROOM", { roomId, name });
 }
 
