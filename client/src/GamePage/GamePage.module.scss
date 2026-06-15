@@ -1,0 +1,80 @@
+@use "../_variables.scss" as *;
+
+.bgBlur {
+  position: absolute;
+  width: 100vw;
+  height: 100vh;
+  background: #000000;
+  opacity: 0.3;
+}
+
+.settingsModal {
+  position: absolute;
+  margin: 10rem 0 0 0;
+  width: 50%;
+
+  padding: 1rem;
+  border: white 2px solid;
+  border-radius: $border-radius-md;
+
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+
+  .settingsBody {
+    width: 100%;
+
+    display: flex;
+    flex-direction: row;
+    gap: 1rem;
+
+    .gameRules {
+      flex: 1;
+    }
+
+    .lobbyRules {
+      flex: 1;
+
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+
+      .roomIdDiv {
+        display: flex;
+        gap: 2rem;
+      }
+
+      .playerProfile {
+        border: white 2px solid;
+        border-radius: $border-radius-md;
+        padding: 0.5rem;
+
+        form {
+          display: flex;
+          justify-content: space-between;
+
+          input:hover {
+            text-decoration: underline;
+          }
+
+          button {
+            padding: 0 0.5rem 0 0.5rem;
+          }
+        }
+      }
+
+      .playerList {
+        border: white 2px solid;
+        border-radius: $border-radius-md;
+
+        * {
+          padding: 0.5rem;
+        }
+
+        *:not(:last-child) {
+          border-bottom: white 2px solid;
+        }
+      }
+    }
+  }
+}
