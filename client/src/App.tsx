@@ -1,8 +1,10 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-import { SocketProvider } from "./services/SocketContext";
+import { SocketProvider } from "./services/SocketProvider";
 import HomePage from "./HomePage/HomePage";
 import GamePage from "./GamePage/GamePage";
 import styles from "./App.module.scss";
+
+// TODO: error handler
 
 export default function App() {
   return (

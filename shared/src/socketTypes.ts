@@ -4,6 +4,7 @@ import { Card, GameState } from "./gameTypes.js";
 
 // Client -> Server
 export type ClientToServerEvents = {
+  REGISTER: (payload: {playerId: string}, ack: () => void) => void;
   CREATE_ROOM: (payload: { name: string }) => void;
   JOIN_ROOM: (payload: { roomId: string; name: string }) => void;
   RENAME_PLAYER: (payload: { roomId: string; newName: string }) => void;
@@ -15,7 +16,7 @@ export type ClientToServerEvents = {
 
 // Server -> Client
 export type ServerToClientEvents = {
-  CONNECTED: (payload: { playerId: string }) => void;
+  CONNECTED: (payload: { socketId: string }) => void;
   GAME_STATE: (state: GameState) => void;
   ROOM_CREATED: (payload: { state: GameState }) => void;
   PLAYER_JOINED: (payload: { state: GameState }) => void;
@@ -35,6 +36,7 @@ export class ServerError extends Error {
 
 export type ErrorCode =
   | "FEATURE_NOT_IMPLEMENTED"
+  | "NOT_REGISTERED"
   | "ROOM_NOT_FOUND"
   | "PLAYER_NOT_FOUND"
   | "INVALID_NUM_PLAYERS"

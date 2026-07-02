@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import styles from "./HomePage.module.scss";
 import { createRoom, joinRoom } from "../services/gameActions";
-import { useGameSocket } from "../services/SocketContext";
+import { useGameSocket } from "../services/useGameSocket";
 import { useNavigate } from "react-router-dom";
 
 export default function HomePage() {
@@ -37,9 +37,7 @@ export default function HomePage() {
         </button>
         <div className={styles.hostJoinDiv}>
           <p>Join Game</p>
-          <form
-            onSubmit={handleRoomIdFormSubmit}
-          >
+          <form onSubmit={handleRoomIdFormSubmit}>
             <input
               type="text"
               placeholder="Enter Room Id"

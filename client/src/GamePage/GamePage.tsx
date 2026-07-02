@@ -1,12 +1,11 @@
 import { useState } from "react";
-import { useGameSocket } from "../services/SocketContext";
+import { useGameSocket } from "../services/useGameSocket";
 import SettingsModal from "./SettingsModal";
 
 export default function GamePage() {
-  const { playerId, gameState } = useGameSocket();
-  const [isSettingsModalOpen, setIsSettingsModalOpen] = useState<boolean>(
-    gameState?.phase === "waiting",
-  );
+  const { isRegistered, playerId, gameState } = useGameSocket();
+  const [isSettingsModalOpen, setIsSettingsModalOpen] =
+    useState<boolean>(false);
 
   // store game settings
 
@@ -20,7 +19,7 @@ export default function GamePage() {
     console.log("start game yayyy");
   };
 
-  if (!gameState || !playerId) {
+  if (!gameState || !gameState.players[playerId]) {
     return <p>no game state :(</p>;
   }
 
@@ -31,7 +30,9 @@ export default function GamePage() {
         <p>WIP</p>
       </div>
 
-      {isSettingsModalOpen && (
+      {isRegistered && <div>registered</div>}
+
+      {(isSettingsModalOpen || gameState?.phase === "waiting") && (
         <SettingsModal
           setIsSettingsOpen={setIsSettingsModalOpen}
           state={gameState}
