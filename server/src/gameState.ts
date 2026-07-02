@@ -5,7 +5,7 @@ import {
   Rank,
   ServerError,
   compareTricks,
-  isPoint,
+  getPointValue,
 } from "@tractor/shared";
 
 export function createRoom(roomId: string): GameState {
@@ -243,7 +243,7 @@ export function playTrick(
         const discard: Card[] = [];
 
         for (const card of trick) {
-          if (isPoint(card)) points.push(card);
+          if (getPointValue(card)) points.push(card);
           else discard.push(card);
         }
 

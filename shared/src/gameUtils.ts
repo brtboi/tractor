@@ -6,12 +6,11 @@ function isTrump(card: Card, trumpSuit: Suit, trumpRank: number): boolean {
   );
 }
 
-export function isPoint(card: Card): boolean {
-  return (
-    card.rank === 5 ||
-    card.rank === 10 ||
-    card.rank === 13
-  );
+export function getPointValue(card: Card): number {
+  if (card.rank === 5) return 5;
+  if (card.rank === 10) return 10;
+  if (card.rank === 13) return 0;
+  return 0;
 }
 
 /**
@@ -233,11 +232,10 @@ function decompositionBeats(
   // Use a greedy: for each a-group, find the lowest-rank b-group that beats it
   const bBySize = new Map<number, number[]>();
   for (const group of bDecomp) {
-    if (!bBySize.has(group.numCards))
-      bBySize.set(group.numCards, []);
+    if (!bBySize.has(group.numCards)) bBySize.set(group.numCards, []);
     bBySize.get(group.numCards)!.push(group.highestRank);
   }
-  
+
   // Sort each size bucket ascending so we use the smallest sufficient rank
   for (const ranks of bBySize.values()) ranks.sort((x, y) => x - y);
 
