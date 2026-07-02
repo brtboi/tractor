@@ -100,7 +100,7 @@ function getTrickSequence(
 ): TrickSequence {
   if (!getTrickSuit(trick, trumpSuit, trumpRank)) return [];
 
-  let degreeSequence: TrickSequence = [];
+  const degreeSequence: TrickSequence = [];
   let i = 0;
   while (i < trick.length) {
     const currentRank = getCanonicalRank(trick[i], trumpSuit, trumpRank);

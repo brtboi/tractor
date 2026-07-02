@@ -17,7 +17,7 @@ export default function HomePage() {
 
   useEffect(() => {
     if (gameState) navigate(`/game/${gameState.roomId}`);
-  }, [gameState]);
+  }, [gameState, navigate]);
 
   return (
     <div className={styles.homePage}>

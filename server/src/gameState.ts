@@ -3,10 +3,9 @@ import {
   Card,
   GameState,
   Rank,
-  isPoint,
-  compareTricks,
   ServerError,
-  ErrorCode,
+  compareTricks,
+  isPoint,
 } from "@tractor/shared";
 
 export function createRoom(roomId: string): GameState {
@@ -53,7 +52,11 @@ export function addPlayer(
   };
 }
 
-export function renamePlayer(state: GameState, playerId: string, newName: string): GameState {
+export function renamePlayer(
+  state: GameState,
+  playerId: string,
+  newName: string,
+): GameState {
   if (!state.players[playerId]) throw new ServerError("PLAYER_NOT_FOUND");
 
   return {
@@ -161,7 +164,10 @@ export function startTestGame(prev: GameState): GameState {
 }
 
 export function startGame(prev: GameState): GameState {
-  throw new ServerError("FEATURE_NOT_IMPLEMENTED", "startGame not implemented, please use startTestGame");
+  throw new ServerError(
+    "FEATURE_NOT_IMPLEMENTED",
+    "startGame not implemented, please use startTestGame",
+  );
 }
 
 export function playTrick(

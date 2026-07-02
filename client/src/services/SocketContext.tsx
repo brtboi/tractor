@@ -1,4 +1,6 @@
 // client/src/services/SocketContext.tsx
+// TODO: fix this actually
+/* eslint-disable react-refresh/only-export-components */
 import {
   createContext,
   useContext,
@@ -26,12 +28,12 @@ export function SocketProvider({ children }: { children: ReactNode }) {
     socket.connect();
 
     socket.on("CONNECTED", () => setPlayerId(socket.id ?? null));
-    socket.on("GAME_STATE", (state) => {
+    socket.on("GAME_STATE", (state: GameState) => {
       console.log("game stated")
       setGameState(state);
     });
-    socket.on("ROOM_CREATED", ({ state }) => setGameState(state));
-    socket.on("ERROR", (message) => setError(message));
+    socket.on("ROOM_CREATED", ({ state }: { state: GameState }) => setGameState(state));
+    socket.on("ERROR", (message: string) => setError(message));
 
     return () => {
       socket.off("CONNECTED");

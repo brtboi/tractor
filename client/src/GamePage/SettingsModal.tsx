@@ -28,8 +28,8 @@ export default function SettingsModal({
       await navigator.clipboard.writeText(state.roomId);
       setGameCodeCopied(true);
       setTimeout(() => setGameCodeCopied(false), 1500);
-    } catch (error) {
-      console.error("game code copy failed");
+    } catch (e) {
+      console.error("game code copy failed", e);
     }
   };
 

@@ -4,7 +4,7 @@ import { Server } from "socket.io";
 import {
   Card,
   GameState,
-  ClientToServerEvents,
+  type ClientToServerEvents,
   ServerToClientEvents,
   ServerError,
 } from "@tractor/shared";
