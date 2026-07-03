@@ -87,6 +87,16 @@ io.on("connection", (socket) => {
     }
   });
 
+  socket.on("ADD_GHOST_PLAYER", ({ roomId }) => {
+    if (!rooms[roomId]) throw new ServerError("ROOM_NOT_FOUND");
+    rooms[roomId] = addPlayer(
+      rooms[roomId],
+      Math.random().toString(36).slice(2, 7).toUpperCase(),
+      "Ghost Player",
+    );
+    broadcastState(roomId);
+  });
+
   // TODO: Leave room
 
   socket.on("RENAME_PLAYER", ({ roomId, newName }) => {

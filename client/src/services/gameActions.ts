@@ -13,6 +13,14 @@ export function joinRoom(roomId: string, name: string = "") {
   socket.emit("JOIN_ROOM", { roomId, name });
 }
 
+export function addGhostPlayer(roomId: string) {
+  socket.emit("ADD_GHOST_PLAYER", { roomId });
+}
+
+export function renamePlayer(roomId: string, newName: string) {
+  socket.emit("RENAME_PLAYER", { roomId, newName });
+}
+
 export function startGame(roomId: string) {
   socket.emit("START_GAME", { roomId });
 }

@@ -4,9 +4,10 @@ import { Card, GameState } from "./gameTypes.js";
 
 // Client -> Server
 export type ClientToServerEvents = {
-  REGISTER: (payload: {playerId: string}, ack: () => void) => void;
+  REGISTER: (payload: { playerId: string }, ack: () => void) => void;
   CREATE_ROOM: (payload: { name: string }) => void;
   JOIN_ROOM: (payload: { roomId: string; name: string }) => void;
+  ADD_GHOST_PLAYER: (payload: { roomId: string }) => void;
   RENAME_PLAYER: (payload: { roomId: string; newName: string }) => void;
   START_GAME: (payload: { roomId: string }) => void;
   START_TEST_GAME: (payload: { roomId: string }) => void;
