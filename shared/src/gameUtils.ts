@@ -1,5 +1,10 @@
 import { Card, Suit, TrickSequence } from "./gameTypes.js";
 
+export function cardToString(card: Card): string {
+  const rank = card.rank.toString().padStart(2, "0");
+  return `${card.suit}_${rank}`;
+}
+
 function isTrump(card: Card, trumpSuit: Suit, trumpRank: number): boolean {
   return (
     card.suit === trumpSuit || card.suit === "Joker" || card.rank === trumpRank

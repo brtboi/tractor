@@ -269,7 +269,7 @@ export function playTrick(
   };
 }
 
-// WIP: Filter state so a player only sees their own hand
+// TODO: Filter state so a player only sees their own hand
 export function stateForPlayer(state: GameState, playerId: string) {
   return state;
 }

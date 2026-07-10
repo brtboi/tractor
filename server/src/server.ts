@@ -114,22 +114,26 @@ io.on("connection", (socket) => {
     }
   });
 
-  socket.on("START_GAME", ({ roomId }) => {
+  socket.on("START_GAME", ({ roomId }, ack) => {
     try {
       rooms[roomId] = startGame(rooms[roomId]);
       broadcastState(roomId);
     } catch (e: any) {
       socket.emit("ERROR", e.message);
     }
+
+    ack?.();
   });
 
-  socket.on("START_TEST_GAME", ({ roomId }) => {
+  socket.on("START_TEST_GAME", ({ roomId }, ack) => {
     try {
       rooms[roomId] = startTestGame(rooms[roomId]);
       broadcastState(roomId);
     } catch (e: any) {
       socket.emit("ERROR", e.message);
     }
+
+    ack?.();
   });
 
   socket.on("PLAY_TRICK", ({ roomId, trick }) => {

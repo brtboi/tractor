@@ -21,12 +21,12 @@ export function renamePlayer(roomId: string, newName: string) {
   socket.emit("RENAME_PLAYER", { roomId, newName });
 }
 
-export function startGame(roomId: string) {
-  socket.emit("START_GAME", { roomId });
+export function startGame(roomId: string, ack: () => void) {
+  socket.emit("START_GAME", { roomId }, ack);
 }
 
-export function startTestGame(roomId: string) {
-  socket.emit("START_TEST_GAME", { roomId });
+export function startTestGame(roomId: string, ack: () => void) {
+  socket.emit("START_TEST_GAME", { roomId }, ack);
 }
 
 export function playTrick(roomId: string, trick: Card[]) {

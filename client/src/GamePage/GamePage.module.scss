@@ -1,5 +1,78 @@
 @use "../_variables.scss" as *;
 
+.cardComponent {
+  --scale: 1;
+  --translate: 0;
+
+  transform: translateY(var(--translate)) scale(var(--scale));
+  transition: transform 70ms cubic-bezier(0.4, -0.12, 0.2, 1.88);
+
+  &:hover {
+    --scale: 1.1;
+  }
+
+  &.selected {
+    --translate: -1rem;
+  }
+
+  .cardImage {
+    width: calc(1.5 * 53px);
+    image-rendering: pixelated;
+  }
+}
+
+.gameBoard {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+
+  $padding: 6rem;
+
+  .cardHand {
+    position: absolute;
+
+    --rotate: 0deg;
+    --translate: translate(0, 0);
+    transform: var(--translate) rotate(var(--rotate));
+
+    display: flex;
+    flex-direction: row;
+
+    &.bottom {
+      bottom: $padding;
+      left: 50%;
+      --translate: translate(-50%, 50%);
+      --rotate: 0deg;
+    }
+
+    &.left {
+      top: 50%;
+      left: $padding;
+      --translate: translate(-50%, -50%);
+      --rotate: 90deg;
+    }
+
+    &.top {
+      top: $padding;
+      left: 50%;
+      --translate: translate(-50%, -50%);
+      --rotate: 180deg;
+    }
+
+    &.right {
+      top: 50%;
+      right: $padding;
+      --translate: translate(50%, -50%);
+      --rotate: 270deg;
+    }
+
+    :not(:first-child) {
+      margin-left: -4rem;
+    }
+  }
+}
+
 .bgBlur {
   position: absolute;
   width: 100vw;
@@ -12,18 +85,15 @@
   position: absolute;
   margin: 10rem 0 0 0;
   width: 50%;
-
   padding: 1rem;
   border: white 2px solid;
   border-radius: $border-radius-md;
-
   display: flex;
   flex-direction: column;
   align-items: center;
 
   .settingsBody {
     width: 100%;
-
     display: flex;
     flex-direction: row;
     gap: 1rem;
@@ -34,7 +104,6 @@
 
     .lobbyRules {
       flex: 1;
-
       display: flex;
       flex-direction: column;
       gap: 1rem;

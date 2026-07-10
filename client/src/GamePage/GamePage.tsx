@@ -1,36 +1,39 @@
 import { useState } from "react";
 import { useGameSocket } from "../services/useGameSocket";
 import SettingsModal from "./SettingsModal";
+import GameBoard from "./GameBoard";
+import {
+  addGhostPlayer,
+  renamePlayer,
+  startTestGame,
+} from "../services/gameActions";
 
 export default function GamePage() {
-  const { isRegistered, playerId, gameState } = useGameSocket();
+  const { playerId, gameState } = useGameSocket();
   const [isSettingsModalOpen, setIsSettingsModalOpen] =
     useState<boolean>(false);
+
+  if (!gameState || !gameState.players[playerId]) {
+    return <p>no game state :(</p>;
+  }
 
   // store game settings
 
   // function for on settings save/close
 
   const changeName = (newName: string) => {
-    console.log(newName);
+    renamePlayer(gameState.roomId, newName);
   };
 
-  const startGame = () => {
-    console.log("start game yayyy");
+  const handleStartTestGame = () => {
+    startTestGame(gameState.roomId, () => {
+      setIsSettingsModalOpen(false);
+    });
   };
-
-  if (!gameState || !gameState.players[playerId]) {
-    return <p>no game state :(</p>;
-  }
 
   return (
     <>
-      <div>
-        <h1>Game Page</h1>
-        <p>WIP</p>
-      </div>
-
-      {isRegistered && <div>registered</div>}
+      <GameBoard />
 
       {(isSettingsModalOpen || gameState?.phase === "waiting") && (
         <SettingsModal
@@ -38,7 +41,10 @@ export default function GamePage() {
           state={gameState}
           playerId={playerId}
           changeName={changeName}
-          startGame={startGame}
+          addGhostPlayer={() => {
+            addGhostPlayer(gameState.roomId);
+          }}
+          startGame={handleStartTestGame}
         />
       )}
     </>
