@@ -13,11 +13,12 @@ export default function GameBoard() {
 
   return (
     <div className={styles.gameBoard}>
-      {gameState.playerOrder.map((playerId) => (
+      
+      {gameState.playerOrder.map((playerId, i) => (
         <CardHand
           cards={currentRound.hands[playerId]}
           isFaceDown={false}
-          orientation={orientation[gameState.playerOrder.indexOf(playerId)]}
+          orientation={orientation[i]}
           isSelectable={true}
         />
       ))}
