@@ -1,10 +1,12 @@
 import express from "express";
 import { createServer } from "http";
-import { Server } from "socket.io";
+import { Server, type Socket } from "socket.io";
 import {
   type GameState,
   type ClientToServerEvents,
   type ServerToClientEvents,
+  type SocketData,
+  type AckResult,
   ServerError,
 } from "@tractor/shared";
 import {
@@ -19,14 +21,26 @@ import {
 
 const app = express();
 const httpServer = createServer(app);
-const io = new Server<ClientToServerEvents, ServerToClientEvents>(httpServer, {
+const io = new Server<
+  ClientToServerEvents,
+  ServerToClientEvents,
+  Record<string, never>,
+  SocketData
+>(httpServer, {
   cors: { origin: "*" },
 });
 
 const rooms: Record<string, GameState> = {};
 const playerToRoom: Record<string, string> = {};
 
-function getPlayerId(socket: any): string {
+function getPlayerId(
+  socket: Socket<
+    ClientToServerEvents,
+    ServerToClientEvents,
+    Record<string, never>,
+    SocketData
+  >,
+): string {
   const playerId = socket.data.playerId;
   if (!playerId) throw new ServerError("NOT_REGISTERED");
   return playerId;
@@ -39,10 +53,17 @@ function broadcastState(roomId: string) {
   });
 }
 
+function toAckResult(e: unknown): AckResult {
+  if (e instanceof ServerError) {
+    return { ok: false, error: e.message, code: e.code };
+  }
+  return { ok: false, error: "Unknown error", code: "UNKNOWN_ERROR" };
+}
+
 io.on("connection", (socket) => {
   console.log("connected:", socket.id);
 
-  socket.on("REGISTER", ({ playerId }, ack) => {
+  socket.on("REGISTER", async ({ playerId }): Promise<AckResult> => {
     socket.data.playerId = playerId;
     socket.join(playerId);
 
@@ -51,10 +72,11 @@ io.on("connection", (socket) => {
       socket.join(roomId);
       socket.emit("GAME_STATE", stateForPlayer(rooms[roomId], playerId));
     }
-    ack?.();
+
+    return { ok: true };
   });
 
-  socket.on("CREATE_ROOM", ({ name }) => {
+  socket.on("CREATE_ROOM", async ({ name }): Promise<AckResult> => {
     try {
       const playerId = getPlayerId(socket);
       const roomId = Math.random().toString(36).slice(2, 7).toUpperCase();
@@ -65,16 +87,17 @@ io.on("connection", (socket) => {
       socket.join(roomId);
       socket.emit("ROOM_CREATED", { state: rooms[roomId] });
       broadcastState(roomId);
-    } catch (e: any) {
-      socket.emit("ERROR", e.message);
+
+      return { ok: true };
+    } catch (e: unknown) {
+      return toAckResult(e);
     }
   });
 
-  socket.on("JOIN_ROOM", ({ roomId, name }) => {
+  socket.on("JOIN_ROOM", async ({ roomId, name }): Promise<AckResult> => {
     try {
       const playerId = getPlayerId(socket);
       if (!rooms[roomId]) throw new ServerError("ROOM_NOT_FOUND");
-      // idempotent: skip addPlayer if already in room (handles reconnect)
       if (!rooms[roomId].players[playerId]) {
         rooms[roomId] = addPlayer(rooms[roomId], playerId, name || playerId);
       }
@@ -82,73 +105,84 @@ io.on("connection", (socket) => {
       playerToRoom[playerId] = roomId;
       socket.join(roomId);
       broadcastState(roomId);
-    } catch (e: any) {
-      socket.emit("ERROR", e.message);
+
+      return { ok: true };
+    } catch (e: unknown) {
+      return toAckResult(e);
     }
   });
 
-  socket.on("ADD_GHOST_PLAYER", ({ roomId }) => {
-    if (!rooms[roomId]) throw new ServerError("ROOM_NOT_FOUND");
-    rooms[roomId] = addPlayer(
-      rooms[roomId],
-      Math.random().toString(36).slice(2, 7).toUpperCase(),
-      "Ghost Player",
-    );
-    broadcastState(roomId);
+  socket.on("ADD_GHOST_PLAYER", async ({ roomId }): Promise<AckResult> => {
+    try {
+      if (!rooms[roomId]) throw new ServerError("ROOM_NOT_FOUND");
+      rooms[roomId] = addPlayer(
+        rooms[roomId],
+        Math.random().toString(36).slice(2, 7).toUpperCase(),
+        "Ghost Player",
+      );
+      broadcastState(roomId);
+
+      return { ok: true };
+    } catch (e: unknown) {
+      return toAckResult(e);
+    }
   });
 
   // TODO: Leave room
 
-  socket.on("RENAME_PLAYER", ({ roomId, newName }) => {
-    try {
-      const playerId = getPlayerId(socket);
-      if (!rooms[roomId]) throw new ServerError("ROOM_NOT_FOUND");
-      rooms[roomId] = renamePlayer(
-        rooms[roomId],
-        playerId,
-        newName || playerId,
-      );
-      broadcastState(roomId);
-    } catch (e: any) {
-      socket.emit("ERROR", e.message);
-    }
-  });
+  socket.on(
+    "RENAME_PLAYER",
+    async ({ roomId, newName }): Promise<AckResult> => {
+      try {
+        const playerId = getPlayerId(socket);
+        if (!rooms[roomId]) throw new ServerError("ROOM_NOT_FOUND");
+        rooms[roomId] = renamePlayer(
+          rooms[roomId],
+          playerId,
+          newName || playerId,
+        );
+        broadcastState(roomId);
 
-  socket.on("START_GAME", ({ roomId }, ack) => {
+        return { ok: true };
+      } catch (e: unknown) {
+        return toAckResult(e);
+      }
+    },
+  );
+
+  socket.on("START_GAME", async ({ roomId }): Promise<AckResult> => {
     try {
       rooms[roomId] = startGame(rooms[roomId]);
       broadcastState(roomId);
-    } catch (e: any) {
-      socket.emit("ERROR", e.message);
+      return { ok: true };
+    } catch (e: unknown) {
+      return toAckResult(e);
     }
-
-    ack?.();
   });
 
-  socket.on("START_TEST_GAME", ({ roomId }, ack) => {
+  socket.on("START_TEST_GAME", async ({ roomId }): Promise<AckResult> => {
     try {
       rooms[roomId] = startTestGame(rooms[roomId]);
       broadcastState(roomId);
-    } catch (e: any) {
-      socket.emit("ERROR", e.message);
+      return { ok: true };
+    } catch (e: unknown) {
+      return toAckResult(e);
     }
-
-    ack?.();
   });
 
-  socket.on("PLAY_TRICK", ({ roomId, trick }) => {
+  socket.on("PLAY_TRICK", async ({ roomId, trick }): Promise<AckResult> => {
     try {
       const playerId = getPlayerId(socket);
       rooms[roomId] = playTrick(rooms[roomId], playerId, trick);
       broadcastState(roomId);
-    } catch (e: any) {
-      socket.emit("ERROR", e.message);
+      return { ok: true };
+    } catch (e: unknown) {
+      return toAckResult(e);
     }
   });
 
   socket.on("disconnect", () => {
     console.log("disconnected:", socket.id);
-    // intentionally do nothing — player can reconnect and REGISTER again
   });
 });
 

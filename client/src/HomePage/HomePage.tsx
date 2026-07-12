@@ -6,18 +6,29 @@ import { useNavigate } from "react-router-dom";
 
 export default function HomePage() {
   const navigate = useNavigate();
-  const { gameState } = useGameSocket();
+  const { gameState, setError } = useGameSocket();
   const [inputtedRoomId, setInputtedRoomId] = useState<string>("");
-
-  const handleRoomIdFormSubmit = (e: React.SubmitEvent<HTMLFormElement>) => {
-    console.log(`form submitted, code: ${inputtedRoomId}`);
-    e.preventDefault();
-    joinRoom(inputtedRoomId);
-  };
 
   useEffect(() => {
     if (gameState) navigate(`/game/${gameState.roomId}`);
   }, [gameState, navigate]);
+
+  const handleRoomIdFormSubmit = async (
+    e: React.SubmitEvent<HTMLFormElement>,
+  ) => {
+    e.preventDefault();
+    const res = await joinRoom(inputtedRoomId);
+    if (!res.ok) {
+      setError(
+        res.code === "ROOM_NOT_FOUND" ? "That room doesn't exist." : res.error,
+      );
+    }
+  };
+
+  const handleCreateRoom = async () => {
+    const res = await createRoom();
+    if (!res.ok) setError(res.error);
+  };
 
   return (
     <div className={styles.homePage}>
@@ -27,12 +38,7 @@ export default function HomePage() {
       </div>
 
       <div className={styles.hostJoinContainer}>
-        <button
-          className={styles.hostJoinDiv}
-          onClick={() => {
-            createRoom();
-          }}
-        >
+        <button className={styles.hostJoinDiv} onClick={handleCreateRoom}>
           <p>Host Game</p>
         </button>
         <div className={styles.hostJoinDiv}>
@@ -48,8 +54,6 @@ export default function HomePage() {
           </form>
         </div>
       </div>
-
-      {/* list public lobbies */}
     </div>
   );
 }

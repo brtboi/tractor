@@ -6,12 +6,14 @@ interface SocketContextValue {
   playerId: string;
   gameState: GameState | null;
   error: string | null;
+  setError: (message: string | null) => void;
 }
 
 export const SocketContext = createContext<SocketContextValue | null>(null);
 
 export function useGameSocket(): SocketContextValue {
   const ctx = useContext(SocketContext);
-  if (!ctx) throw new Error("useGameSocket must be used within SocketProvider");
+  if (!ctx)
+    throw new Error("useGameSocket must be used within a SocketProvider");
   return ctx;
 }

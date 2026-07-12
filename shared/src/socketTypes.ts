@@ -1,17 +1,43 @@
-// shared/src/socketTypes.ts
-
 import { Card, GameState } from "./gameTypes.js";
+
+export type AckResult =
+  | { ok: true }
+  | { ok: false; error: string; code: ErrorCode };
 
 // Client -> Server
 export type ClientToServerEvents = {
-  REGISTER: (payload: { playerId: string }, ack: () => void) => void;
-  CREATE_ROOM: (payload: { name: string }) => void;
-  JOIN_ROOM: (payload: { roomId: string; name: string }) => void;
-  ADD_GHOST_PLAYER: (payload: { roomId: string }) => void;
-  RENAME_PLAYER: (payload: { roomId: string; newName: string }) => void;
-  START_GAME: (payload: { roomId: string }, ack: () => void) => void;
-  START_TEST_GAME: (payload: { roomId: string }, ack: () => void) => void;
-  PLAY_TRICK: (payload: { roomId: string; trick: Card[] }) => void;
+  REGISTER: (
+    payload: { playerId: string },
+    ack: (res: AckResult) => void,
+  ) => void;
+  CREATE_ROOM: (
+    payload: { name: string },
+    ack: (res: AckResult) => void,
+  ) => void;
+  JOIN_ROOM: (
+    payload: { roomId: string; name: string },
+    ack: (res: AckResult) => void,
+  ) => void;
+  ADD_GHOST_PLAYER: (
+    payload: { roomId: string },
+    ack: (res: AckResult) => void,
+  ) => void;
+  RENAME_PLAYER: (
+    payload: { roomId: string; newName: string },
+    ack: (res: AckResult) => void,
+  ) => void;
+  START_GAME: (
+    payload: { roomId: string },
+    ack: (res: AckResult) => void,
+  ) => void;
+  START_TEST_GAME: (
+    payload: { roomId: string },
+    ack: (res: AckResult) => void,
+  ) => void;
+  PLAY_TRICK: (
+    payload: { roomId: string; trick: Card[] },
+    ack: (res: AckResult) => void,
+  ) => void;
   DISCONNECT: () => void;
 };
 
@@ -21,8 +47,11 @@ export type ServerToClientEvents = {
   GAME_STATE: (state: GameState) => void;
   ROOM_CREATED: (payload: { state: GameState }) => void;
   PLAYER_JOINED: (payload: { state: GameState }) => void;
-  ERROR: (message: string) => void;
 };
+
+export interface SocketData {
+  playerId?: string;
+}
 
 // errors
 export class ServerError extends Error {
@@ -47,4 +76,5 @@ export type ErrorCode =
   | "GAME_ALREADY_STARTED"
   | "NOT_YOUR_TURN"
   | "INVALID_TRICK"
-  | "PLAYER_NOT_IN_ROOM";
+  | "PLAYER_NOT_IN_ROOM"
+  | "UNKNOWN_ERROR";

@@ -187,7 +187,6 @@ export function playTrick(
   if (prevRound.currentTurn !== playerId)
     throw new ServerError(
       "NOT_YOUR_TURN",
-      `Expected turn to be ${prevRound.currentTurn}, found ${playerId}`,
     );
   if (!prevRound.trumpSuit)
     throw new ServerError("INVALID_TRICK", "Trump not set");

@@ -9,7 +9,7 @@ import {
 } from "../services/gameActions";
 
 export default function GamePage() {
-  const { playerId, gameState } = useGameSocket();
+  const { playerId, gameState, setError } = useGameSocket();
   const [isSettingsModalOpen, setIsSettingsModalOpen] =
     useState<boolean>(false);
 
@@ -17,19 +17,26 @@ export default function GamePage() {
     return <p>no game state :(</p>;
   }
 
-  // store game settings
-
-  // function for on settings save/close
-
-  const changeName = (newName: string) => {
-    renamePlayer(gameState.roomId, newName);
+  const changeName = async (newName: string) => {
+    const res = await renamePlayer(gameState.roomId, newName);
+    if (!res.ok) setError(res.error);
   };
 
-  const handleStartTestGame = () => {
-    startTestGame(gameState.roomId, () => {
+  const handleAddGhostPlayer = async () => {
+    const res = await addGhostPlayer(gameState.roomId);
+    if (!res.ok) setError(res.error);
+  };
+
+  const handleStartTestGame = async () => {
+    const res = await startTestGame(gameState.roomId);
+    if (res.ok) {
       setIsSettingsModalOpen(false);
-    });
+    } else {
+      setError(res.error);
+    }
   };
+
+  // TODO: settings modal after start game
 
   return (
     <>
@@ -41,9 +48,7 @@ export default function GamePage() {
           state={gameState}
           playerId={playerId}
           changeName={changeName}
-          addGhostPlayer={() => {
-            addGhostPlayer(gameState.roomId);
-          }}
+          addGhostPlayer={handleAddGhostPlayer}
           startGame={handleStartTestGame}
         />
       )}
