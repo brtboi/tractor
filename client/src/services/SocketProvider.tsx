@@ -1,5 +1,5 @@
 import type { GameState } from "@tractor/shared";
-import { type ReactNode, useState, useEffect } from "react";
+import { type ReactNode, useState, useEffect, useCallback } from "react";
 import socket from "./socket";
 import { SocketContext } from "./useGameSocket";
 
@@ -16,7 +16,15 @@ export function SocketProvider({ children }: { children: ReactNode }) {
   const [playerId] = useState<string>(getPlayerId());
   const [isRegistered, setIsRegistered] = useState(false);
   const [gameState, setGameState] = useState<GameState | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [errors, setErrors] = useState<string[]>([]);
+
+  const pushError = useCallback((message: string) => {
+    setErrors((prev) => [...prev, message]);
+  }, []);
+
+  const dismissError = useCallback((index: number) => {
+    setErrors((prev) => prev.filter((_, i) => i !== index));
+  }, []);
 
   useEffect(() => {
     const handleConnect = async () => {
@@ -24,7 +32,7 @@ export function SocketProvider({ children }: { children: ReactNode }) {
       if (res.ok) {
         setIsRegistered(true);
       } else {
-        setError(res.error);
+        pushError(res.error);
       }
     };
 
@@ -47,11 +55,18 @@ export function SocketProvider({ children }: { children: ReactNode }) {
       socket.off("ROOM_CREATED", handleRoomCreated);
       socket.disconnect();
     };
-  }, [playerId]);
+  }, [playerId, pushError]);
 
   return (
     <SocketContext.Provider
-      value={{ isRegistered, playerId, gameState, error, setError }}
+      value={{
+        isRegistered,
+        playerId,
+        gameState,
+        errors,
+        pushError,
+        dismissError,
+      }}
     >
       {children}
     </SocketContext.Provider>

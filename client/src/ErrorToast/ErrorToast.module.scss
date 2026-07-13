@@ -1,0 +1,79 @@
+@use "../_variables.scss" as *;
+
+$toast-width: 24rem;
+
+.toastStack {
+  position: fixed;
+  top: 1.5rem;
+  right: 1.5rem;
+  z-index: 1000;
+
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.errorToast {
+  width: $toast-width;
+  max-width: 90vw;
+
+  overflow: hidden; // keeps progressFill's corners clipped to the toast's radius
+  // TODO: standardize colors
+
+  background: #4a1b0c;
+  border: #d85a30 2px solid;
+  border-radius: $border-radius-md;
+  color: #fac775;
+
+  cursor: pointer;
+
+  animation: slideDown 150ms ease-out;
+
+  .toastContent {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem 1rem;
+
+    p {
+      margin: 0;
+      font-size: 0.9rem;
+      flex: 1;
+    }
+
+    .closeButton {
+      background: none;
+      border: none;
+      color: inherit;
+      font-size: 1.1rem;
+      line-height: 1;
+      cursor: pointer;
+      padding: 0 0.25rem;
+      flex-shrink: 0;
+    }
+  }
+
+  .progressTrack {
+    height: 3px;
+    background: rgba(255, 255, 255, 0.15);
+  }
+
+  .progressFill {
+    height: 100%;
+    background: #d85a30;
+    // no transition here — width is updated every frame via rAF,
+    // adding a transition would fight the rAF updates and look janky
+  }
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-0.5rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

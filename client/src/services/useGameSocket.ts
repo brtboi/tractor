@@ -5,8 +5,9 @@ interface SocketContextValue {
   isRegistered: boolean;
   playerId: string;
   gameState: GameState | null;
-  error: string | null;
-  setError: (message: string | null) => void;
+  errors: string[];
+  pushError: (message: string) => void;
+  dismissError: (index: number) => void;
 }
 
 export const SocketContext = createContext<SocketContextValue | null>(null);

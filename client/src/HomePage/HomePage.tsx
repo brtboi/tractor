@@ -6,7 +6,7 @@ import { useNavigate } from "react-router-dom";
 
 export default function HomePage() {
   const navigate = useNavigate();
-  const { gameState, setError } = useGameSocket();
+  const { gameState, pushError } = useGameSocket();
   const [inputtedRoomId, setInputtedRoomId] = useState<string>("");
 
   useEffect(() => {
@@ -19,7 +19,7 @@ export default function HomePage() {
     e.preventDefault();
     const res = await joinRoom(inputtedRoomId);
     if (!res.ok) {
-      setError(
+      pushError(
         res.code === "ROOM_NOT_FOUND" ? "That room doesn't exist." : res.error,
       );
     }
@@ -27,7 +27,7 @@ export default function HomePage() {
 
   const handleCreateRoom = async () => {
     const res = await createRoom();
-    if (!res.ok) setError(res.error);
+    if (!res.ok) pushError(res.error);
   };
 
   return (
@@ -53,6 +53,13 @@ export default function HomePage() {
             <button type="submit">E</button>
           </form>
         </div>
+        <button
+          onClick={() => {
+            pushError("error test");
+          }}
+        >
+          test toast
+        </button>
       </div>
     </div>
   );
