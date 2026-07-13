@@ -73,6 +73,10 @@ export default function SettingsModal({
                   onChange={(e) => {
                     setPlayerName(e.target.value);
                   }}
+                  onFocus={(e) => {
+                    e.target.select();
+                  }}
+                  spellCheck={false}
                 />
                 <button type="submit">{">"}</button>
               </form>
