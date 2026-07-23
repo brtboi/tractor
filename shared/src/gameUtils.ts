@@ -5,6 +5,37 @@ export function cardToString(card: Card): string {
   return `${card.suit}_${rank}`;
 }
 
+/**
+ * tests for strict equality (including deck)
+ */
+export function isCardEqual(...cards: Card[]): boolean {
+  if (cards.length <= 1) return true;
+
+  const { deck, suit, rank } = cards[0];
+
+  return cards.every(
+    (card) => card.deck === deck && card.suit === suit && card.rank === rank,
+  );
+}
+
+export function isTrickInList(trick: Card[], list: Card[]): boolean {
+  if (trick.length > list.length) return false;
+
+  const listCopy = [...list];
+
+  return trick.every((trickCard) => {
+    const index = listCopy.findIndex((listCard) =>
+      isCardEqual(trickCard, listCard),
+    );
+
+    if (index === -1) return false;
+
+    // remove card from list
+    listCopy.splice(index, 1);
+    return true;
+  });
+}
+
 function isTrump(card: Card, trumpSuit: Suit, trumpRank: number): boolean {
   return (
     card.suit === trumpSuit || card.suit === "Joker" || card.rank === trumpRank
@@ -20,10 +51,10 @@ export function getPointValue(card: Card): number {
 
 /**
  * returns canonical/absolute rank of a card
- * Trump: small trump 502-513 (skip trump rank), trump rank 514, 515, jokers 516, 517.
- * Trump if no trump suit: jokers 515, 516.
- * Spades: 402-413 (skip trump rank), Hearts: 302-313 (skip trump rank),
- * Clubs: 202-213 (skip trump rank), Diamonds: 102-113 (skip trump rank).
+ * - Trump: small trump 502-513 (skip trump rank), trump rank 514 515, jokers 516, 517.
+ * - Trump if no trump suit:                       trump rank     515, jokers 516, 517.
+ * - Spades: 402-413 (skip trump rank), Hearts: 302-313 (skip trump rank),
+ * - Clubs: 202-213 (skip trump rank), Diamonds: 102-113 (skip trump rank).
  */
 function getCanonicalRank(
   card: Card,
@@ -34,17 +65,16 @@ function getCanonicalRank(
   if (card.suit === trumpSuit && card.rank < trumpRank) return card.rank + 500;
   if (card.suit === trumpSuit && card.rank > trumpRank) return card.rank + 499;
 
-  // trump rank 514, 515
+  // trump rank no trump suit 515
+  if (trumpSuit === "Joker" && card.rank === trumpRank) return 515;
+
+  // trump rank yes trump suit 514, 515
   if (card.suit !== trumpSuit && card.rank === trumpRank) return 514;
   if (card.suit === trumpSuit && card.rank === trumpRank) return 515;
 
   // Jokers 516, 517
-  if (trumpSuit !== "Joker" && card.rank === 15) return 516; // small joker
-  if (trumpSuit !== "Joker" && card.rank === 16) return 517; // big joker
-
-  // Jokers no trump 515, 516
-  if (trumpSuit === "Joker" && card.rank === 15) return 515; // small joker
-  if (trumpSuit === "Joker" && card.rank === 16) return 516; // big joker
+  if (card.rank === 15) return 516; // small joker
+  if (card.rank === 16) return 517; // big joker
 
   // Spades 402-413 (skip trump rank)
   if (card.suit === "Spades" && card.rank < trumpRank) return card.rank + 400;
@@ -66,8 +96,38 @@ function getCanonicalRank(
 }
 
 /**
- * returns suit of trick if all cards in trick are of same suit (or joker for trump).
- * returns null if trick is not suited.
+ * returns callLevel of card
+ * - -1 if weird like empty cards or sum or invalid call (single joker)
+ * - 1 for single
+ * - 2000 + canon rank for pair call
+ * - (in theory) n*1000 + canon rank for call with n cards
+ * - i think jokers will work themselves out
+ */
+export function getCallLevel(
+  cards: Card[],
+  trumpRank: number,
+  numDecks: number = 2,
+): number {
+  if (!cards || numDecks <= 1) return -1;
+
+  const { suit, rank } = cards[0];
+
+  // if not all the same card
+  if (cards.some((card) => card.suit !== suit || card.rank !== rank)) return -1;
+
+  // if there's some non trump
+  if (cards.some((card) => !isTrump(card, "Joker", trumpRank))) return -1;
+
+  // if joker and length !== numDecks
+  if (cards[0].rank >= 15 && cards.length !== numDecks) return -1;
+
+  if (cards.length === 1) return 1;
+  return 1000 * cards.length + getCanonicalRank(cards[0], "Joker", -1);
+}
+
+/**
+ * - returns suit of trick if all cards in trick are of same suit (or joker for trump).
+ * - returns null if trick is not suited.
  */
 function getTrickSuit(
   trick: Card[],
@@ -92,10 +152,6 @@ function getTrickSuit(
  * From card[] to array of (number of cards, rank) for each set of consecutive pairs.
  * Assumes trick is sorted by canonical rank.
  * @example [22 33 44 77 A] -> [{numCards: 6, highestRank: 4}, {numCards: 2, highestRank: 7}, {numCards: 1, highestRank: 14}]
- * @param trick
- * @param trumpSuit
- * @param trumpRank
- * @returns
  */
 function getTrickSequence(
   trick: Card[],
@@ -152,8 +208,8 @@ function getTrickSequence(
 
 /**
  * All ways to split a run of `length` pairs (with highestRank) into contiguous sub-runs.
- * A "run" of length 1 is just a pair.
- * Returns array of TrickSequence (each is a list of groups from one split).
+ * - A "run" of length 1 is just a pair.
+ * - Returns array of TrickSequence (each is a list of groups from one split).
  */
 function splitRun(length: number, highestRank: number): TrickSequence[] {
   if (length === 1) {
@@ -196,7 +252,7 @@ function splitRun(length: number, highestRank: number): TrickSequence[] {
 
 /**
  * Generate all decompositions of a TrickSequence.
- * Each group in the sequence is independently split, and we take the cartesian product.
+ * - Each group in the sequence is independently split, and we take the cartesian product.
  */
 function generateDecompositions(sequence: TrickSequence): TrickSequence[] {
   if (sequence.length === 0) return [[]];
@@ -224,8 +280,8 @@ function generateDecompositions(sequence: TrickSequence): TrickSequence[] {
 
 /**
  * Check if decomposition `bDecomp` beats `aSeq` via some bijection:
- * for every group in aSeq, there exists a group in bDecomp with same numCards and strictly higher rank.
- * Uses greedy matching (works because we just need existence of a perfect matching).
+ * - for every group in aSeq, there exists a group in bDecomp with same numCards and strictly higher rank.
+ * - Uses greedy matching (works because we just need existence of a perfect matching).
  */
 function decompositionBeats(
   bDecomp: TrickSequence,

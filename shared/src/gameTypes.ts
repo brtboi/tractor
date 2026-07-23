@@ -44,14 +44,27 @@ export type TrickSequence = {
   highestRank: number;
 }[];
 
+export type RoundPhase = "breaking" | "drawing" | "bottoming" | "asking" | "playing"
+
 export type RoundState = {
+  phase: RoundPhase
   onTeam: TeamId;
+  bottomPlayer: string | null // playerId of whose bottom it is
+
+  // 0 for nobody call yet
+  // 1 for single
+  // 2000 + canon rank for pair call
+  // (in theory) n*1000 + canon rank for call with n cards
+  // i think jokers will work themselves out
+  callLevel: number;
+  callPlayer: string | null;
   trumpSuit: Suit | null; // "Joker" for no trump
   trumpRank: number;
 
   currentTurn: string // playerId
   currentTricks: {playerId: string; trick: Card[]}[];
-
+  
+  drawPile: Card[]
   hands: Record<string, Card[]>; // player ID -> hand
   discards: Record<string, Card[][]>; // player ID -> discarded cards by trick
   points: Card[]; // cards won by off team

@@ -5,7 +5,9 @@ import {
   Rank,
   ServerError,
   compareTricks,
+  isTrickInList,
   getPointValue,
+  getCallLevel,
 } from "@tractor/shared";
 
 export function createRoom(roomId: string): GameState {
@@ -68,33 +70,6 @@ export function renamePlayer(
   };
 }
 
-function shuffleCards(deckCount: number): Card[] {
-  const suits: Suit[] = ["Spades", "Hearts", "Diamonds", "Clubs"];
-  const ranks: Rank[] = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14];
-
-  const deck: Card[] = [];
-
-  for (let i = 0; i < deckCount; i++) {
-    for (const suit of suits) {
-      for (const rank of ranks) {
-        deck.push({ suit, rank, deck: i });
-      }
-    }
-
-    // Add Jokers
-    deck.push({ suit: "Joker", rank: 15, deck: i }); // Small Joker
-    deck.push({ suit: "Joker", rank: 16, deck: i }); // Big Joker
-  }
-
-  // shuffle
-  for (let i = deck.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [deck[i], deck[j]] = [deck[j], deck[i]];
-  }
-
-  return deck;
-}
-
 function testDeal(
   deckCount: number,
   playerIds: string[],
@@ -123,7 +98,7 @@ export function startTestGame(prev: GameState): GameState {
 
   const playerIds = prev.playerOrder;
 
-  const hands = testDeal(2, playerIds);
+  // const hands = testDeal(2, playerIds);
 
   return {
     ...prev,
@@ -147,12 +122,18 @@ export function startTestGame(prev: GameState): GameState {
     ],
 
     currentRound: {
+      phase: "breaking",
       onTeam: "A",
+      bottomPlayer: prev.teams[0].playerIds[0],
+      callLevel: 0,
+      callPlayer: null,
       trumpSuit: "Spades",
       trumpRank: 2,
       currentTurn: playerIds[0],
       currentTricks: [],
-      hands,
+
+      drawPile: shuffleCards(2),
+      hands: prev.playerOrder.reduce((acc, id) => ({ ...acc, [id]: [] }), {}),
       discards: prev.playerOrder.reduce(
         (acc, id) => ({ ...acc, [id]: [] }),
         {},
@@ -170,6 +151,130 @@ export function startGame(prev: GameState): GameState {
   );
 }
 
+function shuffleCards(deckCount: number): Card[] {
+  const suits: Suit[] = ["Spades", "Hearts", "Diamonds", "Clubs"];
+  const ranks: Rank[] = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14];
+
+  const deck: Card[] = [];
+
+  for (let i = 0; i < deckCount; i++) {
+    for (const suit of suits) {
+      for (const rank of ranks) {
+        deck.push({ suit, rank, deck: i });
+      }
+    }
+
+    // Add Jokers
+    deck.push({ suit: "Joker", rank: 15, deck: i }); // Small Joker
+    deck.push({ suit: "Joker", rank: 16, deck: i }); // Big Joker
+  }
+
+  // shuffle
+  for (let i = deck.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [deck[i], deck[j]] = [deck[j], deck[i]];
+  }
+
+  return deck;
+}
+
+// TODO: breakDeck
+// export function breakDeck(prev: GameState, playerId: string, breakAt: number): GameState {
+//   if (!prev.currentRound) throw new ServerError("NO_ACTIVE_ROUND");
+//   if (prev.currentRound.phase !== "breaking")
+//     throw new ServerError(
+//       "INVALID_PHASE",
+//       `should be breaking, found ${prev.currentRound.phase}`,
+//     );
+//   if (
+//     playerId !==
+//     prev.playerOrder[
+//       (prev.playerOrder.indexOf(prev.currentRound.currentTurn) - 1) %
+//         prev.playerOrder.length
+//     ]
+//   )
+//     throw new ServerError("NOT_YOUR_TURN");
+
+//   if (breakAt < 0 || breakAt >= 2 * 54)
+//     throw new ServerError("UNKNOWN_ERROR", "invalid breaking index");
+
+//   const newDrawPile =
+
+//   return {
+//     ...prev,
+//     currentRound: {
+//       ...prev.currentRound
+//       drawPile: prev.
+//     }
+//   }
+// }
+
+export function drawCard(prev: GameState, playerId: string): GameState {
+  if (!prev.currentRound) throw new ServerError("NO_ACTIVE_ROUND");
+  if (prev.currentRound.phase !== "drawing")
+    throw new ServerError(
+      "INVALID_PHASE",
+      `should be drawing, found ${prev.currentRound.phase}`,
+    );
+  if (playerId !== prev.currentRound.currentTurn)
+    throw new ServerError("NOT_YOUR_TURN");
+
+  const newHand = [
+    ...prev.currentRound.hands[playerId],
+    prev.currentRound.drawPile[0],
+  ];
+
+  return {
+    ...prev,
+    currentRound: {
+      ...prev.currentRound,
+      drawPile: prev.currentRound.drawPile.slice(1),
+      hands: {
+        ...prev.currentRound.hands,
+        playerId: newHand,
+      },
+    },
+  };
+}
+
+// TODO: reinforce trump
+
+export function callTrump(
+  prev: GameState,
+  playerId: string,
+  cards: Card[],
+): GameState {
+  if (!prev.currentRound) throw new ServerError("NO_ACTIVE_ROUND");
+  if (prev.currentRound.phase !== "drawing")
+    throw new ServerError(
+      "INVALID_PHASE",
+      `should be drawing, found ${prev.currentRound.phase}`,
+    );
+  const hand = prev.currentRound.hands[playerId];
+  if (!isTrickInList(cards, hand))
+    throw new ServerError("INVALID_TRICK", "cards not found in hand");
+
+  if (playerId === prev.currentRound.callPlayer) return prev;
+
+  const newCallLevel = getCallLevel(cards, prev.currentRound.trumpRank);
+
+  if (newCallLevel <= prev.currentRound.callLevel) return prev;
+
+  // TODO: switch on/off team on first round
+
+  return {
+    ...prev,
+    currentRound: {
+      ...prev.currentRound,
+      callLevel: newCallLevel,
+      callPlayer: playerId,
+      trumpSuit: cards[0].suit,
+    },
+  };
+}
+
+// TODO: bottom eight
+
 export function playTrick(
   prev: GameState,
   playerId: string,
@@ -185,14 +290,12 @@ export function playTrick(
   const prevRound = prev.currentRound;
 
   if (prevRound.currentTurn !== playerId)
-    throw new ServerError(
-      "NOT_YOUR_TURN",
-    );
+    throw new ServerError("NOT_YOUR_TURN");
   if (!prevRound.trumpSuit)
     throw new ServerError("INVALID_TRICK", "Trump not set");
 
-  if (trick.some((card) => !prevRound.hands[playerId].includes(card)))
-    throw new ServerError("INVALID_TRICK", `Card not in hand`);
+  if (!isTrickInList(trick, prevRound.hands[playerId]))
+    throw new ServerError("INVALID_TRICK", "cards not found in hand");
 
   const newCurrentTricks = [
     ...prevRound.currentTricks,
@@ -270,5 +373,6 @@ export function playTrick(
 
 // TODO: Filter state so a player only sees their own hand
 export function stateForPlayer(state: GameState, playerId: string) {
+  // TODO: remember to give bottom eight to correct person
   return state;
 }
