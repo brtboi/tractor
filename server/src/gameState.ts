@@ -1,3 +1,4 @@
+import { produce } from "immer";
 import {
   Suit,
   Card,
@@ -11,7 +12,6 @@ import {
 } from "@tractor/shared";
 
 // TODO: check ServerError types lowk
-// TODO: lowk migrate to immer for immutable state handling
 
 export function createRoom(roomId: string): GameState {
   return {
@@ -36,7 +36,6 @@ export function createRoom(roomId: string): GameState {
         hasPlayed11: false,
       },
     ],
-
     currentRound: null,
   };
 }
@@ -48,14 +47,10 @@ export function addPlayer(
 ): GameState {
   if (state.playerOrder.length >= 4) throw new ServerError("ROOM_FULL");
 
-  return {
-    ...state,
-    playerOrder: [...state.playerOrder, playerId],
-    players: {
-      ...state.players,
-      [playerId]: { id: playerId, name: playerName },
-    },
-  };
+  return produce(state, (draft) => {
+    draft.playerOrder.push(playerId);
+    draft.players[playerId] = { id: playerId, name: playerName };
+  });
 }
 
 export function renamePlayer(
@@ -65,13 +60,9 @@ export function renamePlayer(
 ): GameState {
   if (!state.players[playerId]) throw new ServerError("PLAYER_NOT_FOUND");
 
-  return {
-    ...state,
-    players: {
-      ...state.players,
-      [playerId]: { ...state.players[playerId], name: newName },
-    },
-  };
+  return produce(state, (draft) => {
+    draft.players[playerId].name = newName;
+  });
 }
 
 function testDeal(
@@ -102,13 +93,10 @@ export function startTestGame(prev: GameState): GameState {
 
   const playerIds = prev.playerOrder;
 
-  // const hands = testDeal(2, playerIds);
+  return produce(prev, (draft) => {
+    draft.phase = "playing";
 
-  return {
-    ...prev,
-    phase: "playing",
-
-    teams: [
+    draft.teams = [
       {
         id: "A",
         playerIds: [playerIds[0], playerIds[2]],
@@ -123,9 +111,9 @@ export function startTestGame(prev: GameState): GameState {
         hasPlayed2: false,
         hasPlayed11: false,
       },
-    ],
+    ];
 
-    currentRound: {
+    draft.currentRound = {
       phase: "breaking",
       onTeam: "A",
       onPlayer: prev.teams[0].playerIds[0],
@@ -145,8 +133,8 @@ export function startTestGame(prev: GameState): GameState {
       ),
       points: [],
       bottom: [],
-    },
-  };
+    };
+  });
 }
 
 export function startGame(prev: GameState): GameState {
@@ -168,13 +156,10 @@ function shuffleCards(deckCount: number): Card[] {
         deck.push({ suit, rank, deck: i });
       }
     }
-
-    // Add Jokers
     deck.push({ suit: "Joker", rank: 15, deck: i }); // Small Joker
     deck.push({ suit: "Joker", rank: 16, deck: i }); // Big Joker
   }
 
-  // shuffle
   for (let i = deck.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     [deck[i], deck[j]] = [deck[j], deck[i]];
@@ -183,99 +168,53 @@ function shuffleCards(deckCount: number): Card[] {
   return deck;
 }
 
-// TODO: breakDeck
-// export function breakDeck(prev: GameState, playerId: string, breakAt: number): GameState {
-//   if (!prev.currentRound) throw new ServerError("NO_ACTIVE_ROUND");
-//   if (prev.currentRound.phase !== "breaking")
-//     throw new ServerError(
-//       "INVALID_PHASE",
-//       `should be breaking, found ${prev.currentRound.phase}`,
-//     );
-//   if (
-//     playerId !==
-//     prev.playerOrder[
-//       (prev.playerOrder.indexOf(prev.currentRound.currentTurn) - 1) %
-//         prev.playerOrder.length
-//     ]
-//   )
-//     throw new ServerError("NOT_YOUR_TURN");
-
-//   if (breakAt < 0 || breakAt >= 2 * 54)
-//     throw new ServerError("UNKNOWN_ERROR", "invalid breaking index");
-
-//   const newDrawPile =
-
-//   return {
-//     ...prev,
-//     currentRound: {
-//       ...prev.currentRound
-//       drawPile: prev.
-//     }
-//   }
-// }
-
 /**
- * return playerId of next player according to playerOrder. throws error if no currentRound/currentTurn
+ * returns the playerId after `currentTurn` in `playerOrder`
  */
-function getNextTurn(prev: GameState): string {
-  if (!prev.currentRound || !prev.currentRound.currentTurn)
-    throw new Error("getNextTurn expected currentround found not that");
-  const currentTurn = prev.currentRound.currentTurn;
-  return prev.playerOrder[
-    (prev.playerOrder.indexOf(currentTurn) + 1) % prev.playerOrder.length
-  ];
+function getNextTurn(playerOrder: string[], currentTurn: string): string {
+  const idx = playerOrder.indexOf(currentTurn);
+  if (idx === -1)
+    throw new Error(
+      `getNextTurn: currentTurn ${currentTurn} not found in playerOrder`,
+    );
+  return playerOrder[(idx + 1) % playerOrder.length];
 }
 
 export function drawCard(prev: GameState, playerId: string): GameState {
   if (!prev.currentRound) throw new ServerError("NO_ACTIVE_ROUND");
-
-  const round = prev.currentRound;
-  if (round.phase !== "drawing")
+  if (prev.currentRound.phase !== "drawing")
     throw new ServerError(
       "INVALID_PHASE",
-      `should be drawing, found ${round.phase}`,
+      `should be drawing, found ${prev.currentRound.phase}`,
     );
-  if (playerId !== round.currentTurn) throw new ServerError("NOT_YOUR_TURN");
+  if (playerId !== prev.currentRound.currentTurn)
+    throw new ServerError("NOT_YOUR_TURN");
 
-  const newHand = [...round.hands[playerId], round.drawPile[0]];
+  return produce(prev, (draft) => {
+    const round = draft.currentRound!;
+    const drawnCard = round.drawPile[0];
+    round.hands[playerId].push(drawnCard);
 
-  // drew last card
-  // TODO: check if nobody has called yet
-  if (!round.trumpSuit) {
-    round.trumpSuit = round.drawPile[3].suit;
-    round.callCards = [round.drawPile[3]];
-  }
+    // TODO: check if nobody has called yet
+    if (!round.trumpSuit) {
+      round.trumpSuit = round.drawPile[3].suit;
+      round.callCards = [round.drawPile[3]];
+    }
 
-  // TODO: set on team if first round
+    // TODO: set on team if first round
 
-  if (round.drawPile.length === 9)
-    return {
-      ...prev,
-      currentRound: {
-        ...round,
-        phase: "bottoming",
-        drawPile: [],
-        hands: {
-          ...round.hands,
-          [playerId]: newHand,
-        },
-        bottom: round.drawPile.slice(1),
-      },
-    };
+    const isLastDraw = round.drawPile.length === 9;
+    round.drawPile = round.drawPile.slice(1);
 
-  return {
-    ...prev,
-    currentRound: {
-      ...prev.currentRound,
-      phase: prev.currentRound.drawPile.length === 9 ? "bottoming" : "drawing",
-      currentTurn: getNextTurn(prev),
-      drawPile: prev.currentRound.drawPile.slice(1),
-      hands: {
-        ...prev.currentRound.hands,
-        [playerId]: newHand,
-      },
-    },
-  };
+    if (isLastDraw) {
+      round.phase = "bottoming";
+      round.bottom = round.drawPile; // remaining 8 after slice
+      round.drawPile = [];
+    } else {
+      round.phase = "drawing";
+      round.currentTurn = getNextTurn(prev.playerOrder, playerId);
+    }
+  });
 }
 
 export function reinforceTrump(
@@ -296,11 +235,10 @@ export function reinforceTrump(
       "INVALID_CALL",
       `expected call player ${round.callPlayer}, found player ${playerId}, you can't reinforce trump unless you called`,
     );
-
   if (!isTrickInList(cards, round.hands[playerId]))
     throw new ServerError("INVALID_CALL", "cards not found in hand");
   if (
-    !isTrickInList(prev.currentRound.callCards, cards) ||
+    !isTrickInList(round.callCards, cards) ||
     cards.some(
       (card) => card.rank !== round.trumpRank || card.suit !== round.trumpSuit,
     )
@@ -318,13 +256,9 @@ export function reinforceTrump(
       "reinforce trump must increase call level",
     );
 
-  return {
-    ...prev,
-    currentRound: {
-      ...round,
-      callCards: cards,
-    },
-  };
+  return produce(prev, (draft) => {
+    draft.currentRound!.callCards = cards;
+  });
 }
 
 export function callTrump(
@@ -344,7 +278,6 @@ export function callTrump(
     throw new ServerError("INVALID_CALL", "cards not found in hand");
 
   if (playerId === prev.currentRound.callPlayer) return prev;
-
   if (
     getCallLevel(cards, prev.currentRound.trumpRank) <=
     getCallLevel(prev.currentRound.callCards, prev.currentRound.trumpRank)
@@ -352,18 +285,14 @@ export function callTrump(
     return prev;
 
   // TODO: switch on/off team on first round
-  return {
-    ...prev,
-    currentRound: {
-      ...prev.currentRound,
-      callCards: cards,
-      callPlayer: playerId,
-      trumpSuit: cards[0].suit,
-    },
-  };
+  return produce(prev, (draft) => {
+    const round = draft.currentRound!;
+    round.callCards = cards;
+    round.callPlayer = playerId;
+    round.trumpSuit = cards[0].suit;
+  });
 }
 
-// TODO: individual actions per bottom card switch for others to see maybe
 export function setBottom(
   prev: GameState,
   playerId: string,
@@ -403,24 +332,18 @@ export function setBottom(
       `new hand should have length 25, found ${newHand.length}`,
     );
 
-  return {
-    ...prev,
-    currentRound: {
-      ...prev.currentRound,
-      phase: "asking",
-      bottom: newBottom,
-      hands: {
-        ...prev.currentRound.hands,
-        [playerId]: newHand,
-      },
-    },
-  };
+  return produce(prev, (draft) => {
+    const round = draft.currentRound!;
+    round.phase = "asking";
+    round.bottom = newBottom;
+    round.hands[playerId] = newHand;
+  });
 }
 
 export function skipAsk(prev: GameState, playerId: string): GameState {
   if (!prev.currentRound) throw new ServerError("NO_ACTIVE_ROUND");
-
   const round = prev.currentRound;
+
   if (round.phase !== "asking")
     throw new ServerError(
       "INVALID_PHASE",
@@ -432,25 +355,18 @@ export function skipAsk(prev: GameState, playerId: string): GameState {
       `expected turn ${round.currentTurn}, found ${playerId}`,
     );
 
-  const nextTurn = getNextTurn(prev);
-  // go to playing stage
-  if (nextTurn === round.bottomPlayer)
-    return {
-      ...prev,
-      currentRound: {
-        ...round,
-        phase: "playing",
-        currentTurn: round.onPlayer,
-      },
-    };
+  const nextTurn = getNextTurn(prev.playerOrder, round.currentTurn);
 
-  return {
-    ...prev,
-    currentRound: {
-      ...round,
-      currentTurn: nextTurn,
-    },
-  };
+  return produce(prev, (draft) => {
+    const draftRound = draft.currentRound!;
+    if (nextTurn === round.bottomPlayer) {
+      // go to playing stage
+      draftRound.phase = "playing";
+      draftRound.currentTurn = round.onPlayer;
+    } else {
+      draftRound.currentTurn = nextTurn;
+    }
+  });
 }
 
 export function overturnTrump(
@@ -459,8 +375,8 @@ export function overturnTrump(
   cards: Card[],
 ): GameState {
   if (!prev.currentRound) throw new ServerError("NO_ACTIVE_ROUND");
-
   const round = prev.currentRound;
+
   if (round.phase !== "asking")
     throw new ServerError(
       "INVALID_PHASE",
@@ -473,25 +389,20 @@ export function overturnTrump(
     );
   if (!isTrickInList(cards, round.hands[playerId]))
     throw new ServerError("INVALID_CALL", "cards not in hand");
-
-  // getCallLevel should check that it is valid call (calling with pair and stuff)
   if (
     getCallLevel(cards, round.trumpRank) <=
     getCallLevel(round.callCards, round.trumpRank)
   )
     throw new ServerError("INVALID_CALL", "must call with higher call level");
 
-  return {
-    ...prev,
-    currentRound: {
-      ...round,
-      phase: "bottoming",
-      trumpSuit: cards[0].suit,
-      callCards: cards,
-      bottomPlayer: playerId,
-      currentTurn: playerId,
-    },
-  };
+  return produce(prev, (draft) => {
+    const draftRound = draft.currentRound!;
+    draftRound.phase = "bottoming";
+    draftRound.trumpSuit = cards[0].suit;
+    draftRound.callCards = cards;
+    draftRound.bottomPlayer = playerId;
+    draftRound.currentTurn = playerId;
+  });
 }
 
 export function playTrick(
@@ -512,79 +423,66 @@ export function playTrick(
     throw new ServerError("NOT_YOUR_TURN");
   if (!prevRound.trumpSuit)
     throw new ServerError("INVALID_TRICK", "Trump not set");
-
   if (!isTrickInList(trick, prevRound.hands[playerId]))
     throw new ServerError("INVALID_TRICK", "cards not found in hand");
 
-  const newCurrentTricks = [
-    ...prevRound.currentTricks,
-    { playerId, trick: trick },
-  ];
-  const newHand = prevRound.hands[playerId].filter(
-    (card) => !trick.includes(card),
-  );
-  const newDiscards = prevRound.discards;
-  const newPoints = prevRound.points;
-  let newCurrentTurn: string = getNextTurn(prev);
+  return produce(prev, (draft) => {
+    const round = draft.currentRound!;
 
-  // next Trick: find winner & updates points
-  if (newCurrentTricks.length >= prev.playerOrder.length) {
-    // find winning trick
-    let winnerIndex = 0;
-    for (let i = 1; i < newCurrentTricks.length; i++) {
-      if (
-        compareTricks(
-          newCurrentTricks[i].trick,
-          newCurrentTricks[winnerIndex].trick,
-          newCurrentTricks[0].trick,
-          prevRound.trumpSuit,
-          prevRound.trumpRank,
-        ) > 0
-      )
-        winnerIndex = i;
-    }
-    // winner plays first next trick
-    newCurrentTurn = newCurrentTricks[winnerIndex].playerId;
+    round.currentTricks.push({ playerId, trick });
+    round.hands[playerId] = round.hands[playerId].filter(
+      (card) => !trick.includes(card),
+    );
+    round.currentTurn = getNextTurn(prev.playerOrder, playerId);
 
-    // update discards and points
-    const winningTeam = prev.teams.find((team) =>
-      team.playerIds.includes(newCurrentTricks[winnerIndex].playerId),
-    )!;
-
-    for (const { playerId, trick } of newCurrentTricks) {
-      if (winningTeam.id === prevRound.onTeam) {
-        // onTeam won: all cards are discards
-        newDiscards[playerId] = [...newDiscards[playerId], trick];
-      } else {
-        // offTeam won: split each trick into points and discards
-        const points: Card[] = [];
-        const discard: Card[] = [];
-
-        for (const card of trick) {
-          if (getPointValue(card)) points.push(card);
-          else discard.push(card);
-        }
-
-        newPoints.push(...points);
-        newDiscards[playerId] = [...newDiscards[playerId], discard];
+    // next trick: find winner & update points
+    if (round.currentTricks.length >= prev.playerOrder.length) {
+      let winnerIndex = 0;
+      for (let i = 1; i < round.currentTricks.length; i++) {
+        if (
+          compareTricks(
+            round.currentTricks[i].trick,
+            round.currentTricks[winnerIndex].trick,
+            round.currentTricks[0].trick,
+            round.trumpSuit!,
+            round.trumpRank,
+          ) > 0
+        )
+          winnerIndex = i;
       }
-    }
-  }
 
-  return {
-    ...prev,
-    currentRound: {
-      ...prevRound,
-      currentTurn: newCurrentTurn,
-      currentTricks: newCurrentTricks,
-      hands: {
-        ...prevRound.hands,
-        [playerId]: newHand,
-      },
-      discards: newDiscards,
-      points: newPoints,
-    },
-  };
+      // winner plays first next trick
+      round.currentTurn = round.currentTricks[winnerIndex].playerId;
+
+      const winningTeam = prev.teams.find((team) =>
+        team.playerIds.includes(round.currentTricks[winnerIndex].playerId),
+      )!;
+
+      for (const {
+        playerId: trickPlayerId,
+        trick: playedTrick,
+      } of round.currentTricks) {
+        if (winningTeam.id === round.onTeam) {
+          // onTeam won: all cards are discards
+          round.discards[trickPlayerId].push(playedTrick);
+        } else {
+          // offTeam won: split each trick into points and discards
+          const points: Card[] = [];
+          const discard: Card[] = [];
+
+          for (const card of playedTrick) {
+            if (getPointValue(card)) points.push(card);
+            else discard.push(card);
+          }
+
+          round.points.push(...points);
+          round.discards[trickPlayerId].push(discard);
+        }
+      }
+
+      round.currentTricks = [];
+    }
+  });
 }
 
 // TODO: Filter state so a player only sees their own hand
