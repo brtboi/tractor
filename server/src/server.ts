@@ -170,6 +170,8 @@ io.on("connection", (socket) => {
     }
   });
 
+  // TODO: draw card and call trump and stuff
+
   socket.on("PLAY_TRICK", async ({ roomId, trick }): Promise<AckResult> => {
     try {
       const playerId = getPlayerId(socket);

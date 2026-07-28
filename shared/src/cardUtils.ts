@@ -8,7 +8,7 @@ export function cardToString(card: Card): string {
 /**
  * tests for strict equality (including deck)
  */
-export function isCardEqual(...cards: Card[]): boolean {
+export function isCardSame(...cards: Card[]): boolean {
   if (cards.length <= 1) return true;
 
   const { deck, suit, rank } = cards[0];
@@ -25,7 +25,7 @@ export function isTrickInList(trick: Card[], list: Card[]): boolean {
 
   return trick.every((trickCard) => {
     const index = listCopy.findIndex((listCard) =>
-      isCardEqual(trickCard, listCard),
+      isCardSame(trickCard, listCard),
     );
 
     if (index === -1) return false;
@@ -97,7 +97,7 @@ function getCanonicalRank(
 
 /**
  * returns callLevel of card
- * - -1 if weird like empty cards or sum or invalid call (single joker)
+ * - -1 if weird like empty cards or sum or invalid call (single joker, wrong rank, not a pair, etc.)
  * - 1 for single
  * - 2000 + canon rank for pair call
  * - (in theory) n*1000 + canon rank for call with n cards
@@ -115,7 +115,7 @@ export function getCallLevel(
   // if not all the same card
   if (cards.some((card) => card.suit !== suit || card.rank !== rank)) return -1;
 
-  // if there's some non trump
+  // if there's some non trump (including wrong rank)
   if (cards.some((card) => !isTrump(card, "Joker", trumpRank))) return -1;
 
   // if joker and length !== numDecks
