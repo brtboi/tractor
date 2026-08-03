@@ -2,6 +2,8 @@ import { produce } from "immer";
 import {
   Suit,
   Card,
+  RoundPhase,
+  RoundState,
   GameState,
   Rank,
   ServerError,
@@ -12,6 +14,46 @@ import {
 } from "@tractor/shared";
 
 // TODO: check ServerError types lowk
+
+/**
+ * Asserts that the round exists and (optionally) is in one of the expected
+ * phases. Returns the narrowed, non-null round for convenience.
+ */
+function requireRound(
+  state: GameState,
+  expectedPhase?: RoundPhase | RoundPhase[],
+): RoundState {
+  const round = state.currentRound;
+  if (!round) throw new ServerError("NO_ACTIVE_ROUND");
+
+  if (expectedPhase) {
+    const allowed = Array.isArray(expectedPhase)
+      ? expectedPhase
+      : [expectedPhase];
+    if (!allowed.includes(round.phase)) {
+      throw new ServerError(
+        "INVALID_PHASE",
+        `expected phase ${allowed.join(" or ")}, found ${round.phase}`,
+      );
+    }
+  }
+
+  return round;
+}
+
+/**
+ * Asserts it's the given player's turn. Call after requireRound.
+ */
+function requireTurn(
+  round: Pick<RoundState, "currentTurn">,
+  playerId: string,
+): void {
+  if (round.currentTurn !== playerId)
+    throw new ServerError(
+      "NOT_YOUR_TURN",
+      `expected turn ${round.currentTurn}, found ${playerId}`,
+    );
+}
 
 export function createRoom(roomId: string): GameState {
   return {
@@ -41,26 +83,27 @@ export function createRoom(roomId: string): GameState {
 }
 
 export function addPlayer(
-  state: GameState,
+  prev: GameState,
   playerId: string,
   playerName: string,
 ): GameState {
-  if (state.playerOrder.length >= 4) throw new ServerError("ROOM_FULL");
+  if (prev.phase !== "waiting") throw new ServerError("GAME_ALREADY_STARTED");
+  if (prev.playerOrder.length >= 4) throw new ServerError("ROOM_FULL");
 
-  return produce(state, (draft) => {
+  return produce(prev, (draft) => {
     draft.playerOrder.push(playerId);
     draft.players[playerId] = { id: playerId, name: playerName };
   });
 }
 
 export function renamePlayer(
-  state: GameState,
+  prev: GameState,
   playerId: string,
   newName: string,
 ): GameState {
-  if (!state.players[playerId]) throw new ServerError("PLAYER_NOT_FOUND");
+  if (!prev.players[playerId]) throw new ServerError("PLAYER_NOT_FOUND");
 
-  return produce(state, (draft) => {
+  return produce(prev, (draft) => {
     draft.players[playerId].name = newName;
   });
 }
@@ -85,6 +128,7 @@ function testDeal(
 }
 
 export function startTestGame(prev: GameState): GameState {
+  if (prev.phase !== "waiting") throw new ServerError("GAME_ALREADY_STARTED");
   if (prev.playerOrder.length !== 4)
     throw new ServerError(
       "INVALID_NUM_PLAYERS",
@@ -181,14 +225,8 @@ function getNextTurn(playerOrder: string[], currentTurn: string): string {
 }
 
 export function drawCard(prev: GameState, playerId: string): GameState {
-  if (!prev.currentRound) throw new ServerError("NO_ACTIVE_ROUND");
-  if (prev.currentRound.phase !== "drawing")
-    throw new ServerError(
-      "INVALID_PHASE",
-      `should be drawing, found ${prev.currentRound.phase}`,
-    );
-  if (playerId !== prev.currentRound.currentTurn)
-    throw new ServerError("NOT_YOUR_TURN");
+  const round = requireRound(prev, "drawing");
+  requireTurn(round, playerId);
 
   return produce(prev, (draft) => {
     const round = draft.currentRound!;
@@ -222,14 +260,8 @@ export function reinforceTrump(
   playerId: string,
   cards: Card[],
 ): GameState {
-  if (!prev.currentRound) throw new ServerError("NO_ACTIVE_ROUND");
-  const round = prev.currentRound;
+  const round = requireRound(prev, "drawing");
 
-  if (round.phase !== "drawing")
-    throw new ServerError(
-      "INVALID_PHASE",
-      `expected phase drawing, found ${round.phase}`,
-    );
   if (playerId !== round.callPlayer)
     throw new ServerError(
       "INVALID_CALL",
@@ -266,21 +298,16 @@ export function callTrump(
   playerId: string,
   cards: Card[],
 ): GameState {
-  if (!prev.currentRound) throw new ServerError("NO_ACTIVE_ROUND");
-  if (prev.currentRound.phase !== "drawing")
-    throw new ServerError(
-      "INVALID_PHASE",
-      `should be drawing, found ${prev.currentRound.phase}`,
-    );
+  const round = requireRound(prev, "drawing");
 
-  const hand = prev.currentRound.hands[playerId];
+  const hand = round.hands[playerId];
   if (!isTrickInList(cards, hand))
     throw new ServerError("INVALID_CALL", "cards not found in hand");
 
-  if (playerId === prev.currentRound.callPlayer) return prev;
+  if (playerId === round.callPlayer) return prev;
   if (
-    getCallLevel(cards, prev.currentRound.trumpRank) <=
-    getCallLevel(prev.currentRound.callCards, prev.currentRound.trumpRank)
+    getCallLevel(cards, round.trumpRank) <=
+    getCallLevel(round.callCards, round.trumpRank)
   )
     return prev;
 
@@ -299,22 +326,15 @@ export function setBottom(
   newBottom: Card[],
   newHand: Card[],
 ): GameState {
-  if (!prev.currentRound) throw new ServerError("NO_ACTIVE_ROUND");
-  if (prev.currentRound.phase !== "bottoming")
-    throw new ServerError(
-      "INVALID_PHASE",
-      `should be bottoming, found ${prev.currentRound.phase}`,
-    );
-  if (playerId !== prev.currentRound.bottomPlayer)
+  const round = requireRound(prev, "bottoming");
+
+  if (playerId !== round.bottomPlayer)
     throw new ServerError(
       "NOT_YOUR_TURN",
-      `expected bottom player ${prev.currentRound.bottomPlayer}, found ${playerId}`,
+      `expected bottom player ${round.bottomPlayer}, found ${playerId}`,
     );
 
-  const fullPrevHand = [
-    ...prev.currentRound.bottom,
-    ...prev.currentRound.hands[playerId],
-  ];
+  const fullPrevHand = [...round.bottom, ...round.hands[playerId]];
 
   if (
     !isTrickInList(newBottom, fullPrevHand) ||
@@ -341,19 +361,8 @@ export function setBottom(
 }
 
 export function skipAsk(prev: GameState, playerId: string): GameState {
-  if (!prev.currentRound) throw new ServerError("NO_ACTIVE_ROUND");
-  const round = prev.currentRound;
-
-  if (round.phase !== "asking")
-    throw new ServerError(
-      "INVALID_PHASE",
-      `expected phase asking, found ${round.phase}`,
-    );
-  if (playerId !== round.currentTurn)
-    throw new ServerError(
-      "NOT_YOUR_TURN",
-      `expected turn ${round.currentTurn}, found ${playerId}`,
-    );
+  const round = requireRound(prev, "asking");
+  requireTurn(round, playerId);
 
   const nextTurn = getNextTurn(prev.playerOrder, round.currentTurn);
 
@@ -374,19 +383,9 @@ export function overturnTrump(
   playerId: string,
   cards: Card[],
 ): GameState {
-  if (!prev.currentRound) throw new ServerError("NO_ACTIVE_ROUND");
-  const round = prev.currentRound;
+  const round = requireRound(prev, "asking");
+  requireTurn(round, playerId);
 
-  if (round.phase !== "asking")
-    throw new ServerError(
-      "INVALID_PHASE",
-      `expected phase asking, found ${round.phase}`,
-    );
-  if (playerId !== round.currentTurn)
-    throw new ServerError(
-      "NOT_YOUR_TURN",
-      `expected turn ${round.currentTurn}, found ${playerId}`,
-    );
   if (!isTrickInList(cards, round.hands[playerId]))
     throw new ServerError("INVALID_CALL", "cards not in hand");
   if (
@@ -415,12 +414,10 @@ export function playTrick(
       "GAME_NOT_IN_PROGRESS",
       `Expected phase to be 'playing', found '${prev.phase}'`,
     );
-  if (!prev.currentRound) throw new ServerError("NO_ACTIVE_ROUND");
 
-  const prevRound = prev.currentRound;
+  const prevRound = requireRound(prev);
+  requireTurn(prevRound, playerId);
 
-  if (prevRound.currentTurn !== playerId)
-    throw new ServerError("NOT_YOUR_TURN");
   if (!prevRound.trumpSuit)
     throw new ServerError("INVALID_TRICK", "Trump not set");
   if (!isTrickInList(trick, prevRound.hands[playerId]))
