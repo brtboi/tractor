@@ -17,6 +17,12 @@ import {
   stateForPlayer,
   playTrick,
   renamePlayer,
+  drawCard,
+  callTrump,
+  reinforceTrump,
+  setBottom,
+  skipAsk,
+  overturnTrump,
 } from "./gameState.js";
 
 const app = express();
@@ -170,7 +176,91 @@ io.on("connection", (socket) => {
     }
   });
 
-  // TODO: draw card and call trump and stuff
+  socket.on("DRAW_CARD", async ({ roomId }): Promise<AckResult> => {
+    try {
+      const playerId = getPlayerId(socket);
+      if (!rooms[roomId]) throw new ServerError("ROOM_NOT_FOUND");
+      rooms[roomId] = drawCard(rooms[roomId], playerId);
+      broadcastState(roomId);
+      return { ok: true };
+    } catch (e: unknown) {
+      return toAckResult(e);
+    }
+  });
+
+  socket.on("CALL_TRUMP", async ({ roomId, cards }): Promise<AckResult> => {
+    try {
+      const playerId = getPlayerId(socket);
+      if (!rooms[roomId]) throw new ServerError("ROOM_NOT_FOUND");
+      rooms[roomId] = callTrump(rooms[roomId], playerId, cards);
+      broadcastState(roomId);
+      return { ok: true };
+    } catch (e: unknown) {
+      return toAckResult(e);
+    }
+  });
+
+  socket.on(
+    "REINFORCE_TRUMP",
+    async ({ roomId, cards }): Promise<AckResult> => {
+      try {
+        const playerId = getPlayerId(socket);
+        if (!rooms[roomId]) throw new ServerError("ROOM_NOT_FOUND");
+        rooms[roomId] = reinforceTrump(rooms[roomId], playerId, cards);
+        broadcastState(roomId);
+        return { ok: true };
+      } catch (e: unknown) {
+        return toAckResult(e);
+      }
+    },
+  );
+
+  socket.on(
+    "SET_BOTTOM",
+    async ({ roomId, newBottom, newHand }): Promise<AckResult> => {
+      try {
+        const playerId = getPlayerId(socket);
+        if (!rooms[roomId]) throw new ServerError("ROOM_NOT_FOUND");
+        rooms[roomId] = setBottom(
+          rooms[roomId],
+          playerId,
+          newBottom,
+          newHand,
+        );
+        broadcastState(roomId);
+        return { ok: true };
+      } catch (e: unknown) {
+        return toAckResult(e);
+      }
+    },
+  );
+
+  socket.on("SKIP_ASK", async ({ roomId }): Promise<AckResult> => {
+    try {
+      const playerId = getPlayerId(socket);
+      if (!rooms[roomId]) throw new ServerError("ROOM_NOT_FOUND");
+      rooms[roomId] = skipAsk(rooms[roomId], playerId);
+      broadcastState(roomId);
+      return { ok: true };
+    } catch (e: unknown) {
+      return toAckResult(e);
+    }
+  });
+
+  socket.on(
+    "OVERTURN_TRUMP",
+    async ({ roomId, cards }): Promise<AckResult> => {
+      try {
+        const playerId = getPlayerId(socket);
+        if (!rooms[roomId]) throw new ServerError("ROOM_NOT_FOUND");
+        rooms[roomId] = overturnTrump(rooms[roomId], playerId, cards);
+        broadcastState(roomId);
+        return { ok: true };
+      } catch (e: unknown) {
+        return toAckResult(e);
+      }
+    },
+  );
 
   socket.on("PLAY_TRICK", async ({ roomId, trick }): Promise<AckResult> => {
     try {

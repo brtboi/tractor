@@ -34,6 +34,30 @@ export type ClientToServerEvents = {
     payload: { roomId: string },
     ack: (res: AckResult) => void,
   ) => void;
+  DRAW_CARD: (
+    payload: { roomId: string },
+    ack: (res: AckResult) => void,
+  ) => void;
+  CALL_TRUMP: (
+    payload: { roomId: string; cards: Card[] },
+    ack: (res: AckResult) => void,
+  ) => void;
+  REINFORCE_TRUMP: (
+    payload: { roomId: string; cards: Card[] },
+    ack: (res: AckResult) => void,
+  ) => void;
+  SET_BOTTOM: (
+    payload: { roomId: string; newBottom: Card[]; newHand: Card[] },
+    ack: (res: AckResult) => void,
+  ) => void;
+  SKIP_ASK: (
+    payload: { roomId: string },
+    ack: (res: AckResult) => void,
+  ) => void;
+  OVERTURN_TRUMP: (
+    payload: { roomId: string; cards: Card[] },
+    ack: (res: AckResult) => void,
+  ) => void;
   PLAY_TRICK: (
     payload: { roomId: string; trick: Card[] },
     ack: (res: AckResult) => void,

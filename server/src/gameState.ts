@@ -233,7 +233,7 @@ export function drawCard(prev: GameState, playerId: string): GameState {
     const drawnCard = round.drawPile[0];
     round.hands[playerId].push(drawnCard);
 
-    // TODO: check if nobody has called yet
+    
     if (!round.trumpSuit) {
       round.trumpSuit = round.drawPile[3].suit;
       round.callCards = [round.drawPile[3]];
@@ -243,7 +243,8 @@ export function drawCard(prev: GameState, playerId: string): GameState {
 
     const isLastDraw = round.drawPile.length === 9;
     round.drawPile = round.drawPile.slice(1);
-
+    // TODO: check if nobody has called yet
+    
     if (isLastDraw) {
       round.phase = "bottoming";
       round.bottom = round.drawPile; // remaining 8 after slice
