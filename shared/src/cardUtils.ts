@@ -56,7 +56,7 @@ export function getPointValue(card: Card): number {
  * - Spades: 402-413 (skip trump rank), Hearts: 302-313 (skip trump rank),
  * - Clubs: 202-213 (skip trump rank), Diamonds: 102-113 (skip trump rank).
  */
-function getCanonicalRank(
+export function getCanonicalRank(
   card: Card,
   trumpSuit: Suit,
   trumpRank: number,

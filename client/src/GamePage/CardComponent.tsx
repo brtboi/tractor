@@ -1,3 +1,4 @@
+import { motion } from "framer-motion";
 import clsx from "clsx";
 import { cardToString, type Card } from "@tractor/shared";
 import { type Orientation } from "./GamePageHelpers";
@@ -7,8 +8,9 @@ type BaseProps = {
   orientation: Orientation;
   isFaceDown: boolean;
   isSelected: boolean;
-  onClick: () => void;
-}
+  isSelectable?: boolean;
+  onClick?: () => void;
+};
 
 type Props =
   | (BaseProps & {
@@ -25,6 +27,7 @@ export default function CardComponent({
   orientation,
   card,
   isSelected,
+  isSelectable = false,
   onClick,
 }: Props) {
   // TODO: different card sprite themes
@@ -34,11 +37,20 @@ export default function CardComponent({
     : `${cardToString(card)}.png`;
 
   return (
-    <div
+    <motion.div
+      layout
+      layoutId={card ? `${card.deck}-${card.suit}-${card.rank}` : undefined}
+      initial={{ opacity: 0, y: -60, scale: 0.7 }}
+      animate={{ opacity: 1, y: isSelected ? -24 : 0, scale: 1 }}
+      exit={{ opacity: 0, y: 40, scale: 0.6 }}
+      transition={{ type: "spring", stiffness: 480, damping: 30 }}
+      whileHover={isSelectable ? { scale: 1.1 } : undefined}
+      whileTap={isSelectable ? { scale: 1.04 } : undefined}
       className={clsx(
         styles.cardComponent,
         styles[orientation],
         isSelected && styles.selected,
+        isSelectable && styles.selectable,
       )}
       onClick={onClick}
     >
@@ -46,7 +58,8 @@ export default function CardComponent({
         className={styles.cardImage}
         src={spritePathPrefix + spritePath}
         alt={`card ${spritePath}`}
+        draggable={false}
       />
-    </div>
+    </motion.div>
   );
 }

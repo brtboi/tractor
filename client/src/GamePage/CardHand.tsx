@@ -1,8 +1,8 @@
-import { useState } from "react";
+import { AnimatePresence } from "framer-motion";
 import { clsx } from "clsx";
 import type { Card } from "@tractor/shared";
 import CardComponent from "./CardComponent";
-import { type Orientation } from "./GamePageHelpers";
+import { isCardSelected, type Orientation } from "./GamePageHelpers";
 import styles from "./GamePage.module.scss";
 
 type BaseProps = {
@@ -14,57 +14,51 @@ type Props =
   | (BaseProps & {
       isFaceDown: false;
       cards: Card[];
+      selectedCards?: Card[];
+      onCardClick?: (card: Card) => void;
     })
   | (BaseProps & {
       isFaceDown: true;
       cards: (Card | undefined)[];
     });
 
-export default function CardHand({
-  cards,
-  isFaceDown,
-  orientation,
-  isSelectable,
-}: Props) {
-  // const [hoverIndex, setHoverIndex] = useState<number | null>(null);
-  const [selectedIndices, setSelectedIndices] = useState<Set<number>>(
-    new Set(),
-  );
+function cardKey(card: Card | undefined, index: number): string {
+  return card ? `${card.deck}-${card.suit}-${card.rank}` : `back-${index}`;
+}
 
-  const handleCardClick = (index: number) => {
-    if (!isSelectable) return;
-
-    setSelectedIndices((prev) => {
-      const newSelectedIndices = new Set(prev);
-      if (newSelectedIndices.has(index)) {
-        newSelectedIndices.delete(index);
-      } else {
-        newSelectedIndices.add(index);
-      }
-      return newSelectedIndices;
-    });
-  };
+export default function CardHand(props: Props) {
+  const { orientation, isSelectable, cards } = props;
 
   return (
     <div className={clsx(styles.cardHand, styles[orientation])}>
-      {cards.map((card, i) =>
-        isFaceDown ? (
-          <CardComponent
-            isFaceDown={true}
-            orientation={orientation}
-            isSelected={selectedIndices.has(i)}
-            onClick={() => handleCardClick(i)}
-          />
-        ) : (
-          <CardComponent
-            card={card!}
-            isFaceDown={false}
-            orientation={orientation}
-            isSelected={selectedIndices.has(i)}
-            onClick={() => handleCardClick(i)}
-          />
-        ),
-      )}
+      <AnimatePresence initial={false}>
+        {cards.map((card, i) =>
+          props.isFaceDown ? (
+            <CardComponent
+              key={cardKey(card, i)}
+              isFaceDown={true}
+              orientation={orientation}
+              isSelected={false}
+            />
+          ) : (
+            <CardComponent
+              key={cardKey(card!, i)}
+              card={card!}
+              isFaceDown={false}
+              orientation={orientation}
+              isSelectable={isSelectable}
+              isSelected={
+                isSelectable
+                  ? isCardSelected(card!, props.selectedCards ?? [])
+                  : false
+              }
+              onClick={
+                isSelectable ? () => props.onCardClick?.(card!) : undefined
+              }
+            />
+          ),
+        )}
+      </AnimatePresence>
     </div>
   );
 }

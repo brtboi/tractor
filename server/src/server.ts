@@ -69,7 +69,7 @@ function toAckResult(e: unknown): AckResult {
 io.on("connection", (socket) => {
   console.log("connected:", socket.id);
 
-  socket.on("REGISTER", async ({ playerId }): Promise<AckResult> => {
+  socket.on("REGISTER", async ({ playerId }, ack) => {
     socket.data.playerId = playerId;
     socket.join(playerId);
 
@@ -79,10 +79,10 @@ io.on("connection", (socket) => {
       socket.emit("GAME_STATE", stateForPlayer(rooms[roomId], playerId));
     }
 
-    return { ok: true };
+    ack({ ok: true });
   });
 
-  socket.on("CREATE_ROOM", async ({ name }): Promise<AckResult> => {
+  socket.on("CREATE_ROOM", async ({ name }, ack) => {
     try {
       const playerId = getPlayerId(socket);
       const roomId = Math.random().toString(36).slice(2, 7).toUpperCase();
@@ -94,13 +94,13 @@ io.on("connection", (socket) => {
       socket.emit("ROOM_CREATED", { state: rooms[roomId] });
       broadcastState(roomId);
 
-      return { ok: true };
+      ack({ ok: true });
     } catch (e: unknown) {
-      return toAckResult(e);
+      ack(toAckResult(e));
     }
   });
 
-  socket.on("JOIN_ROOM", async ({ roomId, name }): Promise<AckResult> => {
+  socket.on("JOIN_ROOM", async ({ roomId, name }, ack) => {
     try {
       const playerId = getPlayerId(socket);
       if (!rooms[roomId]) throw new ServerError("ROOM_NOT_FOUND");
@@ -112,13 +112,13 @@ io.on("connection", (socket) => {
       socket.join(roomId);
       broadcastState(roomId);
 
-      return { ok: true };
+      ack({ ok: true });
     } catch (e: unknown) {
-      return toAckResult(e);
+      ack(toAckResult(e));
     }
   });
 
-  socket.on("ADD_GHOST_PLAYER", async ({ roomId }): Promise<AckResult> => {
+  socket.on("ADD_GHOST_PLAYER", async ({ roomId }, ack) => {
     try {
       if (!rooms[roomId]) throw new ServerError("ROOM_NOT_FOUND");
       rooms[roomId] = addPlayer(
@@ -128,148 +128,131 @@ io.on("connection", (socket) => {
       );
       broadcastState(roomId);
 
-      return { ok: true };
+      ack({ ok: true });
     } catch (e: unknown) {
-      return toAckResult(e);
+      ack(toAckResult(e));
     }
   });
 
   // TODO: Leave room
 
-  socket.on(
-    "RENAME_PLAYER",
-    async ({ roomId, newName }): Promise<AckResult> => {
-      try {
-        const playerId = getPlayerId(socket);
-        if (!rooms[roomId]) throw new ServerError("ROOM_NOT_FOUND");
-        rooms[roomId] = renamePlayer(
-          rooms[roomId],
-          playerId,
-          newName || playerId,
-        );
-        broadcastState(roomId);
+  socket.on("RENAME_PLAYER", async ({ roomId, newName }, ack) => {
+    try {
+      const playerId = getPlayerId(socket);
+      if (!rooms[roomId]) throw new ServerError("ROOM_NOT_FOUND");
+      rooms[roomId] = renamePlayer(
+        rooms[roomId],
+        playerId,
+        newName || playerId,
+      );
+      broadcastState(roomId);
 
-        return { ok: true };
-      } catch (e: unknown) {
-        return toAckResult(e);
-      }
-    },
-  );
+      ack({ ok: true });
+    } catch (e: unknown) {
+      ack(toAckResult(e));
+    }
+  });
 
-  socket.on("START_GAME", async ({ roomId }): Promise<AckResult> => {
+  socket.on("START_GAME", async ({ roomId }, ack) => {
     try {
       rooms[roomId] = startGame(rooms[roomId]);
       broadcastState(roomId);
-      return { ok: true };
+      ack({ ok: true });
     } catch (e: unknown) {
-      return toAckResult(e);
+      ack(toAckResult(e));
     }
   });
 
-  socket.on("START_TEST_GAME", async ({ roomId }): Promise<AckResult> => {
+  socket.on("START_TEST_GAME", async ({ roomId }, ack) => {
     try {
       rooms[roomId] = startTestGame(rooms[roomId]);
       broadcastState(roomId);
-      return { ok: true };
+      ack({ ok: true });
     } catch (e: unknown) {
-      return toAckResult(e);
+      ack(toAckResult(e));
     }
   });
 
-  socket.on("DRAW_CARD", async ({ roomId }): Promise<AckResult> => {
+  socket.on("DRAW_CARD", async ({ roomId }, ack) => {
     try {
       const playerId = getPlayerId(socket);
       if (!rooms[roomId]) throw new ServerError("ROOM_NOT_FOUND");
       rooms[roomId] = drawCard(rooms[roomId], playerId);
       broadcastState(roomId);
-      return { ok: true };
+      ack({ ok: true });
     } catch (e: unknown) {
-      return toAckResult(e);
+      ack(toAckResult(e));
     }
   });
 
-  socket.on("CALL_TRUMP", async ({ roomId, cards }): Promise<AckResult> => {
+  socket.on("CALL_TRUMP", async ({ roomId, cards }, ack) => {
     try {
       const playerId = getPlayerId(socket);
       if (!rooms[roomId]) throw new ServerError("ROOM_NOT_FOUND");
       rooms[roomId] = callTrump(rooms[roomId], playerId, cards);
       broadcastState(roomId);
-      return { ok: true };
+      ack({ ok: true });
     } catch (e: unknown) {
-      return toAckResult(e);
+      ack(toAckResult(e));
     }
   });
 
-  socket.on(
-    "REINFORCE_TRUMP",
-    async ({ roomId, cards }): Promise<AckResult> => {
-      try {
-        const playerId = getPlayerId(socket);
-        if (!rooms[roomId]) throw new ServerError("ROOM_NOT_FOUND");
-        rooms[roomId] = reinforceTrump(rooms[roomId], playerId, cards);
-        broadcastState(roomId);
-        return { ok: true };
-      } catch (e: unknown) {
-        return toAckResult(e);
-      }
-    },
-  );
+  socket.on("REINFORCE_TRUMP", async ({ roomId, cards }, ack) => {
+    try {
+      const playerId = getPlayerId(socket);
+      if (!rooms[roomId]) throw new ServerError("ROOM_NOT_FOUND");
+      rooms[roomId] = reinforceTrump(rooms[roomId], playerId, cards);
+      broadcastState(roomId);
+      ack({ ok: true });
+    } catch (e: unknown) {
+      ack(toAckResult(e));
+    }
+  });
 
-  socket.on(
-    "SET_BOTTOM",
-    async ({ roomId, newBottom, newHand }): Promise<AckResult> => {
-      try {
-        const playerId = getPlayerId(socket);
-        if (!rooms[roomId]) throw new ServerError("ROOM_NOT_FOUND");
-        rooms[roomId] = setBottom(
-          rooms[roomId],
-          playerId,
-          newBottom,
-          newHand,
-        );
-        broadcastState(roomId);
-        return { ok: true };
-      } catch (e: unknown) {
-        return toAckResult(e);
-      }
-    },
-  );
+  socket.on("SET_BOTTOM", async ({ roomId, newBottom, newHand }, ack) => {
+    try {
+      const playerId = getPlayerId(socket);
+      if (!rooms[roomId]) throw new ServerError("ROOM_NOT_FOUND");
+      rooms[roomId] = setBottom(rooms[roomId], playerId, newBottom, newHand);
+      broadcastState(roomId);
+      ack({ ok: true });
+    } catch (e: unknown) {
+      ack(toAckResult(e));
+    }
+  });
 
-  socket.on("SKIP_ASK", async ({ roomId }): Promise<AckResult> => {
+  socket.on("SKIP_ASK", async ({ roomId }, ack) => {
     try {
       const playerId = getPlayerId(socket);
       if (!rooms[roomId]) throw new ServerError("ROOM_NOT_FOUND");
       rooms[roomId] = skipAsk(rooms[roomId], playerId);
       broadcastState(roomId);
-      return { ok: true };
+      ack({ ok: true });
     } catch (e: unknown) {
-      return toAckResult(e);
+      ack(toAckResult(e));
     }
   });
 
-  socket.on(
-    "OVERTURN_TRUMP",
-    async ({ roomId, cards }): Promise<AckResult> => {
-      try {
-        const playerId = getPlayerId(socket);
-        if (!rooms[roomId]) throw new ServerError("ROOM_NOT_FOUND");
-        rooms[roomId] = overturnTrump(rooms[roomId], playerId, cards);
-        broadcastState(roomId);
-        return { ok: true };
-      } catch (e: unknown) {
-        return toAckResult(e);
-      }
-    },
-  );
+  socket.on("OVERTURN_TRUMP", async ({ roomId, cards }, ack) => {
+    try {
+      const playerId = getPlayerId(socket);
+      if (!rooms[roomId]) throw new ServerError("ROOM_NOT_FOUND");
+      rooms[roomId] = overturnTrump(rooms[roomId], playerId, cards);
+      broadcastState(roomId);
+      ack({ ok: true });
+    } catch (e: unknown) {
+      ack(toAckResult(e));
+    }
+  });
 
-  socket.on("PLAY_TRICK", async ({ roomId, trick }): Promise<AckResult> => {
+  socket.on("PLAY_TRICK", async ({ roomId, trick }, ack) => {
     try {
       const playerId = getPlayerId(socket);
       rooms[roomId] = playTrick(rooms[roomId], playerId, trick);
       broadcastState(roomId);
-      return { ok: true };
+      ack({ ok: true });
     } catch (e: unknown) {
-      return toAckResult(e);
+      ack(toAckResult(e));
     }
   });
 

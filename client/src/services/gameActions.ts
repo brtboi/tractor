@@ -34,3 +34,40 @@ export function startTestGame(roomId: string): Promise<AckResult> {
 export function playTrick(roomId: string, trick: Card[]): Promise<AckResult> {
   return socket.emitWithAck("PLAY_TRICK", { roomId, trick });
 }
+
+export function drawCard(roomId: string): Promise<AckResult> {
+  return socket.emitWithAck("DRAW_CARD", { roomId });
+}
+
+export function callTrump(
+  roomId: string,
+  cards: Card[],
+): Promise<AckResult> {
+  return socket.emitWithAck("CALL_TRUMP", { roomId, cards });
+}
+
+export function reinforceTrump(
+  roomId: string,
+  cards: Card[],
+): Promise<AckResult> {
+  return socket.emitWithAck("REINFORCE_TRUMP", { roomId, cards });
+}
+
+export function setBottom(
+  roomId: string,
+  newBottom: Card[],
+  newHand: Card[],
+): Promise<AckResult> {
+  return socket.emitWithAck("SET_BOTTOM", { roomId, newBottom, newHand });
+}
+
+export function skipAsk(roomId: string): Promise<AckResult> {
+  return socket.emitWithAck("SKIP_ASK", { roomId });
+}
+
+export function overturnTrump(
+  roomId: string,
+  cards: Card[],
+): Promise<AckResult> {
+  return socket.emitWithAck("OVERTURN_TRUMP", { roomId, cards });
+}

@@ -158,10 +158,10 @@ export function startTestGame(prev: GameState): GameState {
     ];
 
     draft.currentRound = {
-      phase: "breaking",
+      phase: "drawing",
       onTeam: "A",
-      onPlayer: prev.teams[0].playerIds[0],
-      bottomPlayer: prev.teams[0].playerIds[0],
+      onPlayer: playerIds[0],
+      bottomPlayer: playerIds[0],
       callCards: [],
       callPlayer: null,
       trumpSuit: "Spades",
@@ -233,7 +233,6 @@ export function drawCard(prev: GameState, playerId: string): GameState {
     const drawnCard = round.drawPile[0];
     round.hands[playerId].push(drawnCard);
 
-    
     if (!round.trumpSuit) {
       round.trumpSuit = round.drawPile[3].suit;
       round.callCards = [round.drawPile[3]];
@@ -244,7 +243,7 @@ export function drawCard(prev: GameState, playerId: string): GameState {
     const isLastDraw = round.drawPile.length === 9;
     round.drawPile = round.drawPile.slice(1);
     // TODO: check if nobody has called yet
-    
+
     if (isLastDraw) {
       round.phase = "bottoming";
       round.bottom = round.drawPile; // remaining 8 after slice
@@ -313,6 +312,10 @@ export function callTrump(
     return prev;
 
   // TODO: switch on/off team on first round
+  // if it is VERY FIRST ROUND of the game, the first player to call becomes on team.
+  // this can be changed if someone overturns BEFORE drawing is over
+  // overturning trump after bottom eight has been bottomed does NOT change on team and off team
+  // after bottoming, the on team and off team are locked in for the rest of the round with the person who bottomed/last called trump playing first
   return produce(prev, (draft) => {
     const round = draft.currentRound!;
     round.callCards = cards;
