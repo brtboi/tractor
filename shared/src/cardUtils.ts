@@ -112,7 +112,7 @@ export function getCallLevel(
   trumpRank: number,
   numDecks: number = 2,
 ): number {
-  if (!cards || numDecks <= 1) return -1;
+  if (!cards || cards.length === 0 || numDecks <= 1) return -1;
 
   const { suit, rank } = cards[0];
 

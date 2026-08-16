@@ -12,6 +12,7 @@ import {
   getPointValue,
   getCallLevel,
   isCardSame,
+  Team,
 } from "@tractor/shared";
 
 // TODO: check ServerError types lowk
@@ -54,6 +55,10 @@ function requireTurn(
       "NOT_YOUR_TURN",
       `expected turn ${round.currentTurn}, found ${playerId}`,
     );
+}
+
+function getTeam(playerId: string, teams: Team[]) {
+  return teams.findIndex((team) => team.playerIds.includes(playerId));
 }
 
 export function createRoom(roomId: string): GameState {
@@ -120,7 +125,7 @@ export function renameTeam(
   newName: string,
 ): GameState {
   if (!prev.players[playerId]) throw new ServerError("PLAYER_NOT_FOUND");
-  if (!prev.teams[teamIndex].playerIds.includes(playerId))
+  if (getTeam(playerId, prev.teams) !== teamIndex)
     throw new ServerError(
       "NOT_YOUR_TURN",
       `playerId: ${playerId}, not on team ${teamIndex}`,
@@ -164,6 +169,7 @@ function newRound(
     bottomPlayer: onPlayer,
     callCards: [],
     callPlayer: null,
+    isFinalCall: false,
     trumpSuit: "Spades",
     trumpRank: trumpRank,
     currentTurn: onPlayer,
@@ -305,16 +311,21 @@ export function drawCard(prev: GameState, playerId: string): GameState {
       round.callCards = [round.drawPile[3]];
     }
 
-    // TODO: set on team if first round
-
     const isLastDraw = round.drawPile.length === 9;
     round.drawPile = round.drawPile.slice(1);
-    // TODO: check if nobody has called yet
 
     if (isLastDraw) {
       round.phase = "bottoming";
       round.bottom = round.drawPile; // remaining 8 after slice
       round.drawPile = [];
+
+      // ask around to call if nobody has called yet
+      if (round.callPlayer === null) {
+        round.phase = "asking_before_bottoming";
+        round.currentTurn = round.onPlayer;
+      }
+
+      // todo set on team if first round
     } else {
       round.phase = "drawing";
       round.currentTurn = getNextTurn(prev.playerOrder, playerId);
@@ -425,14 +436,16 @@ export function setBottom(
 
   return produce(prev, (draft) => {
     const round = draft.currentRound!;
-    round.phase = "asking";
+    // if trump was already locked in from the bottom (isFinalCall), nobody
+    // can overturn anymore, so skip straight to playing instead of asking
+    round.phase = round.isFinalCall ? "playing" : "asking";
     round.bottom = newBottom;
     round.hands[playerId] = newHand;
   });
 }
 
 export function skipAsk(prev: GameState, playerId: string): GameState {
-  const round = requireRound(prev, "asking");
+  const round = requireRound(prev, ["asking", "asking_before_bottoming"]);
   requireTurn(round, playerId);
 
   const nextTurn = getNextTurn(prev.playerOrder, round.currentTurn);
@@ -441,7 +454,16 @@ export function skipAsk(prev: GameState, playerId: string): GameState {
     const draftRound = draft.currentRound!;
     if (nextTurn === round.bottomPlayer) {
       // go to playing stage
-      draftRound.phase = "playing";
+      if (draftRound.phase === "asking") {
+        draftRound.phase = "playing";
+      } else {
+        // nobody called trump the entire round: trump is decided by the
+        // third card of the bottom eight, and can no longer be overturned
+        draftRound.isFinalCall = true;
+        draftRound.phase = "bottoming";
+        draftRound.trumpSuit = round.bottom[2].suit;
+      }
+
       draftRound.currentTurn = round.onPlayer;
     } else {
       draftRound.currentTurn = nextTurn;
@@ -454,7 +476,7 @@ export function overturnTrump(
   playerId: string,
   cards: Card[],
 ): GameState {
-  const round = requireRound(prev, "asking");
+  const round = requireRound(prev, ["asking", "asking_before_bottoming"]);
   requireTurn(round, playerId);
 
   if (!isTrickInList(cards, round.hands[playerId]))
@@ -575,9 +597,13 @@ export function playTrick(
       // winner plays first next trick
       round.currentTurn = round.currentTricks[winnerIndex].playerId;
 
-      const winningTeam = prev.teams.findIndex((team) =>
-        team.playerIds.includes(round.currentTricks[winnerIndex].playerId),
-      )!;
+      const winningTeam = getTeam(playerId, draft.teams);
+
+      if (winningTeam === -1)
+        throw new ServerError(
+          "PLAYER_NOT_FOUND",
+          `cannot find player ${playerId} in teams. Team 0: ${draft.teams[0].playerIds}. Team 1: ${draft.teams[1].playerIds}`,
+        );
 
       for (const {
         playerId: trickPlayerId,
@@ -623,5 +649,15 @@ export function playTrick(
 export function stateForPlayer(state: GameState, playerId: string) {
   // TODO: remember to give bottom eight to correct person
   // show everyone bottom eight if game phase is waiting next round
+
+  // when currentRound.isFinalCall is true, trumpSuit was determined by
+  // round.bottom[2] (nobody called trump for the whole round, so the third
+  // card of the bottom eight was revealed to set trump). trumpSuit itself is
+  // already safe to send to everyone at that point, but round.bottom as a
+  // whole should still stay hidden from non-bottomPlayer players (besides
+  // that one revealed card) until the round reaches "waiting_next_round" -
+  // so here, if isFinalCall is true and playerId !== bottomPlayer, send only
+  // round.bottom[2] (e.g. as a single-card array) instead of the full bottom.
+
   return state;
 }

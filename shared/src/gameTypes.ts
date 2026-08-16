@@ -37,6 +37,7 @@ export type TrickSequence = {
 export type RoundPhase =
   | "breaking"
   | "drawing"
+  | "asking_before_bottoming"
   | "bottoming"
   | "asking"
   | "playing";
@@ -49,6 +50,7 @@ export type RoundState = {
 
   callCards: Card[];
   callPlayer: string | null;
+  isFinalCall: boolean; // if nobody called during drawing -> trump decided from bottom
   trumpSuit: Suit | null; // "Joker" for no trump
   trumpRank: number;
 
@@ -94,7 +96,7 @@ export type GameState = {
   playerOrder: string[]; // player IDs in seating order
   teams: Team[];
 
-  currentRoundNumber: number;
+  currentRoundNumber: number; // 0 index
   currentRound: RoundState | null;
 
   settings: GameSettings
