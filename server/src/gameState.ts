@@ -64,14 +64,14 @@ export function createRoom(roomId: string): GameState {
     playerOrder: [],
     teams: [
       {
-        id: "A",
+        name: "team 0",
         playerIds: [],
         score: 0,
         hasPlayed2: false,
         hasPlayed11: false,
       },
       {
-        id: "B",
+        name: "team 1",
         playerIds: [],
         score: 0,
         hasPlayed2: false,
@@ -108,6 +108,43 @@ export function renamePlayer(
   });
 }
 
+export function renameTeam(
+  prev: GameState,
+  playerId: string,
+  teamIndex: number,
+  newName: string,
+): GameState {
+  if (!prev.players[playerId]) throw new ServerError("PLAYER_NOT_FOUND");
+  if (!prev.teams[teamIndex].playerIds.includes(playerId))
+    throw new ServerError(
+      "NOT_YOUR_TURN",
+      `playerId: ${playerId}, not on team ${teamIndex}`,
+    );
+  return produce(prev, (draft) => {
+    draft.teams[teamIndex].name = newName;
+  });
+}
+
+export function reorderPlayers(
+  prev: GameState,
+  newPlayerOrder: string[],
+): GameState {
+  if (prev.phase !== "waiting") throw new ServerError("GAME_ALREADY_STARTED");
+  if (newPlayerOrder.length !== prev.playerOrder.length)
+    throw new ServerError(
+      "INVALID_NUM_PLAYERS",
+      `expected ${prev.playerOrder.length} players, found ${newPlayerOrder.length}`,
+    );
+  if (newPlayerOrder.some((playerId) => !prev.playerOrder.includes(playerId)))
+    throw new ServerError("PLAYER_NOT_FOUND");
+
+  return produce(prev, (draft) => {
+    draft.playerOrder = newPlayerOrder;
+    draft.teams[0].playerIds = [newPlayerOrder[0], newPlayerOrder[2]];
+    draft.teams[1].playerIds = [newPlayerOrder[1], newPlayerOrder[3]];
+  });
+}
+
 function testDeal(
   deckCount: number,
   playerIds: string[],
@@ -135,38 +172,24 @@ export function startTestGame(prev: GameState): GameState {
       `Need 4 players to start game, found ${prev.playerOrder.length}`,
     );
 
-  const playerIds = prev.playerOrder;
+  const playerOrder = prev.playerOrder;
 
   return produce(prev, (draft) => {
     draft.phase = "playing";
 
-    draft.teams = [
-      {
-        id: "A",
-        playerIds: [playerIds[0], playerIds[2]],
-        score: 0,
-        hasPlayed2: false,
-        hasPlayed11: false,
-      },
-      {
-        id: "B",
-        playerIds: [playerIds[1], playerIds[3]],
-        score: 0,
-        hasPlayed2: false,
-        hasPlayed11: false,
-      },
-    ];
+    draft.teams[0].playerIds = [playerOrder[0], playerOrder[2]];
+    draft.teams[1].playerIds = [playerOrder[1], playerOrder[3]];
 
     draft.currentRound = {
       phase: "drawing",
-      onTeam: "A",
-      onPlayer: playerIds[0],
-      bottomPlayer: playerIds[0],
+      onTeam: 0,
+      onPlayer: playerOrder[0],
+      bottomPlayer: playerOrder[0],
       callCards: [],
       callPlayer: null,
       trumpSuit: "Spades",
       trumpRank: 2,
-      currentTurn: playerIds[0],
+      currentTurn: playerOrder[0],
       currentTricks: [],
 
       drawPile: shuffleCards(2),
@@ -211,6 +234,8 @@ function shuffleCards(deckCount: number): Card[] {
 
   return deck;
 }
+
+// TODO: breaking
 
 /**
  * returns the playerId after `currentTurn` in `playerOrder`
@@ -455,7 +480,7 @@ export function playTrick(
       // winner plays first next trick
       round.currentTurn = round.currentTricks[winnerIndex].playerId;
 
-      const winningTeam = prev.teams.find((team) =>
+      const winningTeam = prev.teams.findIndex((team) =>
         team.playerIds.includes(round.currentTricks[winnerIndex].playerId),
       )!;
 
@@ -463,7 +488,7 @@ export function playTrick(
         playerId: trickPlayerId,
         trick: playedTrick,
       } of round.currentTricks) {
-        if (winningTeam.id === round.onTeam) {
+        if (winningTeam === round.onTeam) {
           // onTeam won: all cards are discards
           round.discards[trickPlayerId].push(playedTrick);
         } else {

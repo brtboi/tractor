@@ -29,16 +29,6 @@ export type Player = {
   name: string;
 };
 
-export type TeamId = "A" | "B";
-
-export type Team = {
-  id: TeamId;
-  playerIds: string[];
-  score: number;
-  hasPlayed2: boolean;
-  hasPlayed11: boolean;
-};
-
 export type TrickSequence = {
   numCards: number;
   highestRank: number;
@@ -53,7 +43,7 @@ export type RoundPhase =
 
 export type RoundState = {
   phase: RoundPhase;
-  onTeam: TeamId;
+  onTeam: number; // index in gameState.teams
   onPlayer: string; // playerId of who's on (who goes first)
   bottomPlayer: string | null; // playerId of whose bottom it is
 
@@ -72,6 +62,14 @@ export type RoundState = {
   bottom: Card[]; // cards on the bottom
 };
 
+export type Team = {
+  name: string;
+  playerIds: string[];
+  score: number;
+  hasPlayed2: boolean;
+  hasPlayed11: boolean;
+};
+
 export type GamePhase = "waiting" | "playing" | "game_over";
 
 export type GameState = {
@@ -83,4 +81,7 @@ export type GameState = {
 
   currentRoundNumber: number;
   currentRound: RoundState | null;
+
+  // TODO: chats?
+  // TODO: be able to change number of decks
 };
