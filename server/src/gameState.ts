@@ -11,6 +11,7 @@ import {
   isTrickInList,
   getPointValue,
   getCallLevel,
+  isCardSame,
 } from "@tractor/shared";
 
 // TODO: check ServerError types lowk
@@ -58,7 +59,8 @@ function requireTurn(
 export function createRoom(roomId: string): GameState {
   return {
     roomId,
-    phase: "waiting",
+    phase: "waiting_start",
+    winner: -1,
     currentRoundNumber: 0,
     players: {},
     playerOrder: [],
@@ -66,19 +68,21 @@ export function createRoom(roomId: string): GameState {
       {
         name: "team 0",
         playerIds: [],
-        score: 0,
-        hasPlayed2: false,
-        hasPlayed11: false,
+        score: 2,
+        hasPlayed: new Array(15).fill(0),
       },
       {
         name: "team 1",
         playerIds: [],
-        score: 0,
-        hasPlayed2: false,
-        hasPlayed11: false,
+        score: 2,
+        hasPlayed: new Array(15).fill(0),
       },
     ],
     currentRound: null,
+    settings: {
+      mustPlay: new Array(15).fill(0),
+      maxScoreJump: 4,
+    },
   };
 }
 
@@ -87,7 +91,8 @@ export function addPlayer(
   playerId: string,
   playerName: string,
 ): GameState {
-  if (prev.phase !== "waiting") throw new ServerError("GAME_ALREADY_STARTED");
+  if (prev.phase !== "waiting_start")
+    throw new ServerError("GAME_ALREADY_STARTED");
   if (prev.playerOrder.length >= 4) throw new ServerError("ROOM_FULL");
 
   return produce(prev, (draft) => {
@@ -129,7 +134,8 @@ export function reorderPlayers(
   prev: GameState,
   newPlayerOrder: string[],
 ): GameState {
-  if (prev.phase !== "waiting") throw new ServerError("GAME_ALREADY_STARTED");
+  if (prev.phase !== "waiting_start")
+    throw new ServerError("GAME_ALREADY_STARTED");
   if (newPlayerOrder.length !== prev.playerOrder.length)
     throw new ServerError(
       "INVALID_NUM_PLAYERS",
@@ -145,27 +151,35 @@ export function reorderPlayers(
   });
 }
 
-function testDeal(
-  deckCount: number,
-  playerIds: string[],
-): Record<string, Card[]> {
-  const deck = shuffleCards(deckCount);
+function newRound(
+  onTeam: number,
+  onPlayer: string,
+  playerOrder: string[],
+  trumpRank: number,
+): RoundState {
+  return {
+    phase: "breaking",
+    onTeam: onTeam,
+    onPlayer: onPlayer,
+    bottomPlayer: onPlayer,
+    callCards: [],
+    callPlayer: null,
+    trumpSuit: "Spades",
+    trumpRank: trumpRank,
+    currentTurn: onPlayer,
+    currentTricks: [],
 
-  const hands: Record<string, Card[]> = playerIds.reduce(
-    (acc, id) => ({ ...acc, [id]: [] }),
-    {},
-  );
-
-  for (let i = 0; i < deck.length; i++) {
-    const playerId = playerIds[i % playerIds.length];
-    hands[playerId].push(deck[i]);
-  }
-
-  return hands;
+    drawPile: shuffleCards(2),
+    hands: playerOrder.reduce((acc, id) => ({ ...acc, [id]: [] }), {}),
+    discards: playerOrder.reduce((acc, id) => ({ ...acc, [id]: [] }), {}),
+    points: [],
+    bottom: [],
+  };
 }
 
 export function startTestGame(prev: GameState): GameState {
-  if (prev.phase !== "waiting") throw new ServerError("GAME_ALREADY_STARTED");
+  if (prev.phase !== "waiting_start")
+    throw new ServerError("GAME_ALREADY_STARTED");
   if (prev.playerOrder.length !== 4)
     throw new ServerError(
       "INVALID_NUM_PLAYERS",
@@ -180,27 +194,7 @@ export function startTestGame(prev: GameState): GameState {
     draft.teams[0].playerIds = [playerOrder[0], playerOrder[2]];
     draft.teams[1].playerIds = [playerOrder[1], playerOrder[3]];
 
-    draft.currentRound = {
-      phase: "breaking",
-      onTeam: 0,
-      onPlayer: playerOrder[0],
-      bottomPlayer: playerOrder[0],
-      callCards: [],
-      callPlayer: null,
-      trumpSuit: "Spades",
-      trumpRank: 2,
-      currentTurn: playerOrder[0],
-      currentTricks: [],
-
-      drawPile: shuffleCards(2),
-      hands: prev.playerOrder.reduce((acc, id) => ({ ...acc, [id]: [] }), {}),
-      discards: prev.playerOrder.reduce(
-        (acc, id) => ({ ...acc, [id]: [] }),
-        {},
-      ),
-      points: [],
-      bottom: [],
-    };
+    draft.currentRound = newRound(0, playerOrder[0], playerOrder, 2);
   });
 }
 
@@ -235,7 +229,6 @@ function shuffleCards(deckCount: number): Card[] {
   return deck;
 }
 
-// TODO: breaking
 export function breakDeck(
   prev: GameState,
   playerId: string,
@@ -482,6 +475,59 @@ export function overturnTrump(
   });
 }
 
+function getNextRound(draft: GameState, totalPoints: number) {
+  const round = draft.currentRound!;
+  let onTeam = round.onTeam;
+
+  let currentScore: number;
+  let nextScore: number;
+
+  // onTeam proceed
+  if (totalPoints < 80) {
+    currentScore = draft.teams[onTeam].score;
+    draft.teams[onTeam].hasPlayed[currentScore] = 2;
+    nextScore = currentScore + Math.floor((119 - totalPoints) / 40);
+  }
+
+  // offTeam proceed
+  else {
+    onTeam = 1 - onTeam;
+    currentScore = draft.teams[onTeam].score;
+    nextScore =
+      currentScore +
+      Math.min(
+        Math.floor((totalPoints - 80) / 40),
+        draft.settings.maxScoreJump,
+      );
+  }
+
+  // check if they can jump all the way to nextScore
+  for (; currentScore <= nextScore; currentScore++) {
+    if (currentScore === 15) {
+      draft.phase = "game_over";
+      draft.winner = onTeam;
+      return;
+    }
+
+    if (
+      draft.settings.mustPlay[currentScore] >
+      draft.teams[onTeam].hasPlayed[currentScore]
+    )
+      break;
+  }
+
+  draft.teams[onTeam].score = currentScore;
+  draft.teams[onTeam].hasPlayed[currentScore] = 1;
+
+  draft.phase = "waiting_next_round";
+  draft.currentRound = newRound(
+    onTeam,
+    getNextTurn(draft.playerOrder, round.onPlayer, totalPoints < 80 ? 2 : 1),
+    draft.playerOrder,
+    draft.teams[onTeam].score,
+  );
+}
+
 export function playTrick(
   prev: GameState,
   playerId: string,
@@ -506,12 +552,12 @@ export function playTrick(
 
     round.currentTricks.push({ playerId, trick });
     round.hands[playerId] = round.hands[playerId].filter(
-      (card) => !trick.includes(card),
+      (card) => !trick.some((c) => isCardSame(c, card)),
     );
     round.currentTurn = getNextTurn(prev.playerOrder, playerId);
 
     // next trick: find winner & update points
-    if (round.currentTricks.length >= prev.playerOrder.length) {
+    if (round.currentTricks.length === prev.playerOrder.length) {
       let winnerIndex = 0;
       for (let i = 1; i < round.currentTricks.length; i++) {
         if (
@@ -556,6 +602,19 @@ export function playTrick(
       }
 
       round.currentTricks = [];
+
+      // out of cards: end round
+      if (round.hands[round.currentTurn].length === 0) {
+        draft.phase = "waiting_next_round";
+
+        let totalPoints = getPointValue(round.points);
+
+        // get points from bottom
+        if (winningTeam !== round.onTeam)
+          totalPoints += trick.length * 2 * getPointValue(round.bottom);
+
+        getNextRound(draft, totalPoints);
+      }
     }
   });
 }
@@ -563,5 +622,6 @@ export function playTrick(
 // TODO: Filter state so a player only sees their own hand
 export function stateForPlayer(state: GameState, playerId: string) {
   // TODO: remember to give bottom eight to correct person
+  // show everyone bottom eight if game phase is waiting next round
   return state;
 }

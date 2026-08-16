@@ -42,7 +42,11 @@ function isTrump(card: Card, trumpSuit: Suit, trumpRank: number): boolean {
   );
 }
 
-export function getPointValue(card: Card): number {
+export function getPointValue(card: Card | Card[]): number {
+  if (Array.isArray(card)) {
+    return card.reduce((sum, c) => sum + getPointValue(c), 0);
+  }
+
   if (card.rank === 5) return 5;
   if (card.rank === 10) return 10;
   if (card.rank === 13) return 0;

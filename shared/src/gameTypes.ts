@@ -62,19 +62,34 @@ export type RoundState = {
   bottom: Card[]; // cards on the bottom
 };
 
+// array of 0 | 1 | 2 for each score 2-14 (length 15)
+// 0 for has not played at all
+// 1 for has touched but not beaten
+// 2 for has beaten
+// index 0 and 1 of the array don't mean anything
+export type PlayedScores = (0 | 1 | 2)[];
+
+export type GameSettings = {
+  // TODO: daniel vs brent style for overturning trump
+  mustPlay: PlayedScores;
+  // maximum number of levels the offTeam can jump
+  maxScoreJump: number;
+};
+
 export type Team = {
   name: string;
   playerIds: string[];
   score: number;
-  hasPlayed2: boolean;
-  hasPlayed11: boolean;
+
+  hasPlayed: PlayedScores;
 };
 
-export type GamePhase = "waiting" | "playing" | "game_over";
+export type GamePhase = "waiting_start" | "waiting_next_round" | "playing" | "game_over";
 
 export type GameState = {
   roomId: string;
   phase: GamePhase;
+  winner: number; // -1 for null
   players: Record<string, Player>; // player ID -> Player
   playerOrder: string[]; // player IDs in seating order
   teams: Team[];
@@ -82,6 +97,9 @@ export type GameState = {
   currentRoundNumber: number;
   currentRound: RoundState | null;
 
+  settings: GameSettings
+
   // TODO: chats?
+  // TODO: player stats for that game: points scores, rounds won, mvp, etc.
   // TODO: be able to change number of decks
 };
