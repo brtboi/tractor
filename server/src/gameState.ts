@@ -181,7 +181,7 @@ export function startTestGame(prev: GameState): GameState {
     draft.teams[1].playerIds = [playerOrder[1], playerOrder[3]];
 
     draft.currentRound = {
-      phase: "drawing",
+      phase: "breaking",
       onTeam: 0,
       onPlayer: playerOrder[0],
       bottomPlayer: playerOrder[0],
@@ -236,17 +236,66 @@ function shuffleCards(deckCount: number): Card[] {
 }
 
 // TODO: breaking
+export function breakDeck(
+  prev: GameState,
+  playerId: string,
+  breakAt: number,
+): GameState {
+  const round = requireRound(prev, "breaking");
+  const breakerId = getNextTurn(prev.playerOrder, round.onPlayer, -1);
+  if (playerId !== breakerId)
+    throw new ServerError(
+      "NOT_YOUR_TURN",
+      `expected playerId ${breakerId}, found ${playerId}`,
+    );
+  if (!Number.isInteger(breakAt) || breakAt < 0 || breakAt > 2 * 54)
+    throw new ServerError(
+      "INVALID_BREAK",
+      `break index out of bounds: ${breakAt}`,
+    );
+
+  return produce(prev, (draft) => {
+    const drawPile = draft.currentRound!.drawPile;
+    if (breakAt === 2 * 54)
+      round.drawPile = [drawPile[breakAt], ...drawPile.slice(0, breakAt - 1)];
+    else
+      round.drawPile = [
+        ...drawPile.slice(breakAt + 1),
+        ...drawPile.slice(0, breakAt),
+      ];
+  });
+}
+
+export function finishBreaking(prev: GameState, playerId: string): GameState {
+  const round = requireRound(prev, "breaking");
+  const breakerId = getNextTurn(prev.playerOrder, round.onPlayer, -1);
+  if (playerId !== breakerId)
+    throw new ServerError(
+      "NOT_YOUR_TURN",
+      `expected playerId ${breakerId}, found ${playerId}`,
+    );
+
+  return produce(prev, (draft) => {
+    draft.currentRound!.phase = "drawing";
+  });
+}
 
 /**
  * returns the playerId after `currentTurn` in `playerOrder`
  */
-function getNextTurn(playerOrder: string[], currentTurn: string): string {
+function getNextTurn(
+  playerOrder: string[],
+  currentTurn: string,
+  increment: number = 1,
+): string {
   const idx = playerOrder.indexOf(currentTurn);
   if (idx === -1)
     throw new Error(
       `getNextTurn: currentTurn ${currentTurn} not found in playerOrder`,
     );
-  return playerOrder[(idx + 1) % playerOrder.length];
+  return playerOrder[
+    (idx + increment + playerOrder.length) % playerOrder.length
+  ];
 }
 
 export function drawCard(prev: GameState, playerId: string): GameState {

@@ -100,6 +100,7 @@ export type ErrorCode =
   | "GAME_ALREADY_STARTED"
   | "INVALID_PHASE"
   | "NOT_YOUR_TURN"
+  | "INVALID_BREAK"
   | "INVALID_CALL"
   | "INVALID_BOTTOM"
   | "INVALID_TRICK"
