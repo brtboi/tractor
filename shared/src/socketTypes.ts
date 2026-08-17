@@ -26,11 +26,27 @@ export type ClientToServerEvents = {
     payload: { roomId: string; newName: string },
     ack: (res: AckResult) => void,
   ) => void;
+  RENAME_TEAM: (
+    payload: { roomId: string; teamIndex: number; newName: string },
+    ack: (res: AckResult) => void,
+  ) => void;
+  REORDER_PLAYERS: (
+    payload: { roomId: string; newPlayerOrder: string[] },
+    ack: (res: AckResult) => void,
+  ) => void;
   START_GAME: (
     payload: { roomId: string },
     ack: (res: AckResult) => void,
   ) => void;
   START_TEST_GAME: (
+    payload: { roomId: string },
+    ack: (res: AckResult) => void,
+  ) => void;
+  BREAK_DECK: (
+    payload: { roomId: string; breakAt: number },
+    ack: (res: AckResult) => void,
+  ) => void;
+  FINISH_BREAKING: (
     payload: { roomId: string },
     ack: (res: AckResult) => void,
   ) => void;

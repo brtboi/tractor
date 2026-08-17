@@ -17,6 +17,10 @@ import {
   stateForPlayer,
   playTrick,
   renamePlayer,
+  renameTeam,
+  reorderPlayers,
+  breakDeck,
+  finishBreaking,
   drawCard,
   callTrump,
   reinforceTrump,
@@ -153,6 +157,31 @@ io.on("connection", (socket) => {
     }
   });
 
+  socket.on("RENAME_TEAM", async ({ roomId, teamIndex, newName }, ack) => {
+    try {
+      const playerId = getPlayerId(socket);
+      if (!rooms[roomId]) throw new ServerError("ROOM_NOT_FOUND");
+      rooms[roomId] = renameTeam(rooms[roomId], playerId, teamIndex, newName);
+      broadcastState(roomId);
+
+      ack({ ok: true });
+    } catch (e: unknown) {
+      ack(toAckResult(e));
+    }
+  });
+
+  socket.on("REORDER_PLAYERS", async ({ roomId, newPlayerOrder }, ack) => {
+    try {
+      if (!rooms[roomId]) throw new ServerError("ROOM_NOT_FOUND");
+      rooms[roomId] = reorderPlayers(rooms[roomId], newPlayerOrder);
+      broadcastState(roomId);
+
+      ack({ ok: true });
+    } catch (e: unknown) {
+      ack(toAckResult(e));
+    }
+  });
+
   socket.on("START_GAME", async ({ roomId }, ack) => {
     try {
       rooms[roomId] = startGame(rooms[roomId]);
@@ -166,6 +195,30 @@ io.on("connection", (socket) => {
   socket.on("START_TEST_GAME", async ({ roomId }, ack) => {
     try {
       rooms[roomId] = startTestGame(rooms[roomId]);
+      broadcastState(roomId);
+      ack({ ok: true });
+    } catch (e: unknown) {
+      ack(toAckResult(e));
+    }
+  });
+
+  socket.on("BREAK_DECK", async ({ roomId, breakAt }, ack) => {
+    try {
+      const playerId = getPlayerId(socket);
+      if (!rooms[roomId]) throw new ServerError("ROOM_NOT_FOUND");
+      rooms[roomId] = breakDeck(rooms[roomId], playerId, breakAt);
+      broadcastState(roomId);
+      ack({ ok: true });
+    } catch (e: unknown) {
+      ack(toAckResult(e));
+    }
+  });
+
+  socket.on("FINISH_BREAKING", async ({ roomId }, ack) => {
+    try {
+      const playerId = getPlayerId(socket);
+      if (!rooms[roomId]) throw new ServerError("ROOM_NOT_FOUND");
+      rooms[roomId] = finishBreaking(rooms[roomId], playerId);
       broadcastState(roomId);
       ack({ ok: true });
     } catch (e: unknown) {
