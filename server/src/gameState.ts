@@ -323,9 +323,11 @@ export function drawCard(prev: GameState, playerId: string): GameState {
       if (round.callPlayer === null) {
         round.phase = "asking_before_bottoming";
         round.currentTurn = round.onPlayer;
+      } else if (draft.currentRoundNumber === 0) {
+        // set on/off team if first round based off of who called
+        round.onTeam = getTeam(round.callPlayer, draft.teams);
+        round.bottomPlayer = round.callPlayer;
       }
-
-      // todo set on team if first round
     } else {
       round.phase = "drawing";
       round.currentTurn = getNextTurn(prev.playerOrder, playerId);
@@ -389,11 +391,6 @@ export function callTrump(
   )
     return prev;
 
-  // TODO: switch on/off team on first round
-  // if it is VERY FIRST ROUND of the game, the first player to call becomes on team.
-  // this can be changed if someone overturns BEFORE drawing is over
-  // overturning trump after bottom eight has been bottomed does NOT change on team and off team
-  // after bottoming, the on team and off team are locked in for the rest of the round with the person who bottomed/last called trump playing first
   return produce(prev, (draft) => {
     const round = draft.currentRound!;
     round.callCards = cards;
@@ -457,8 +454,9 @@ export function skipAsk(prev: GameState, playerId: string): GameState {
       if (draftRound.phase === "asking") {
         draftRound.phase = "playing";
       } else {
-        // nobody called trump the entire round: trump is decided by the
-        // third card of the bottom eight, and can no longer be overturned
+        // if nobody called during drawing, trump decided by third card on bottom
+        // trump cannot be overturned if this happens
+        // if first round, whoever drew first is on by default set at create new game
         draftRound.isFinalCall = true;
         draftRound.phase = "bottoming";
         draftRound.trumpSuit = round.bottom[2].suit;
@@ -494,6 +492,11 @@ export function overturnTrump(
     draftRound.callCards = cards;
     draftRound.bottomPlayer = playerId;
     draftRound.currentTurn = playerId;
+
+    // reset on/off team if first round and overturned
+    if (round.phase === "asking_before_bottoming" && draft.currentRoundNumber === 0) {
+      draftRound.onTeam = getTeam(playerId, draft.teams);
+    }
   });
 }
 
@@ -542,6 +545,7 @@ function getNextRound(draft: GameState, totalPoints: number) {
   draft.teams[onTeam].hasPlayed[currentScore] = 1;
 
   draft.phase = "waiting_next_round";
+  draft.currentRoundNumber += 1;
   draft.currentRound = newRound(
     onTeam,
     getNextTurn(draft.playerOrder, round.onPlayer, totalPoints < 80 ? 2 : 1),
