@@ -306,6 +306,18 @@
   opacity: 0.3;
 }
 
+.settingsGearButton {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 50%;
+  border: white 2px solid;
+  font-size: 1.1rem;
+  z-index: 5;
+}
+
 .settingsModal {
   position: absolute;
   margin: 10rem 0 0 0;
@@ -316,6 +328,22 @@
   display: flex;
   flex-direction: column;
   align-items: center;
+
+  .settingsHeader {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+
+    .closeSettingsButton {
+      position: absolute;
+      right: 0;
+      border-radius: 50%;
+      width: 1.75rem;
+      height: 1.75rem;
+    }
+  }
 
   .settingsBody {
     width: 100%;

@@ -49,6 +49,14 @@ export function updateSettings(
   return socket.emitWithAck("UPDATE_SETTINGS", { roomId, settings });
 }
 
+export function pauseGame(roomId: string): Promise<AckResult> {
+  return socket.emitWithAck("PAUSE_GAME", { roomId });
+}
+
+export function resumeGame(roomId: string): Promise<AckResult> {
+  return socket.emitWithAck("RESUME_GAME", { roomId });
+}
+
 export function startGame(roomId: string): Promise<AckResult> {
   return socket.emitWithAck("START_GAME", { roomId });
 }

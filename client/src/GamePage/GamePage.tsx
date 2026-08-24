@@ -4,11 +4,14 @@ import type { GameSettings } from "@tractor/shared";
 import { useGameSocket } from "../services/useGameSocket";
 import SettingsModal from "./SettingsModal";
 import GameBoard from "./GameBoard";
+import styles from "./GamePage.module.scss";
 import {
   addGhostPlayer,
   leaveRoom,
+  pauseGame,
   renamePlayer,
   reorderPlayers,
+  resumeGame,
   startTestGame,
   updateSettings,
 } from "../services/gameActions";
@@ -52,6 +55,16 @@ export default function GamePage() {
     if (!res.ok) pushError(res.error);
   };
 
+  const handlePauseGame = async () => {
+    const res = await pauseGame(gameState.roomId);
+    if (!res.ok) pushError(res.error);
+  };
+
+  const handleResumeGame = async () => {
+    const res = await resumeGame(gameState.roomId);
+    if (!res.ok) pushError(res.error);
+  };
+
   const handleStartTestGame = async () => {
     const res = await startTestGame(gameState.roomId);
     if (res.ok) {
@@ -61,13 +74,25 @@ export default function GamePage() {
     }
   };
 
-  // TODO: settings modal after start game
+  const isModalShowing =
+    isSettingsModalOpen ||
+    gameState.phase === "waiting_start" ||
+    gameState.paused;
 
   return (
     <>
       {gameState.currentRound && <GameBoard />}
 
-      {(isSettingsModalOpen || gameState.phase === "waiting_start") && (
+      {gameState.currentRound && !isModalShowing && (
+        <button
+          className={styles.settingsGearButton}
+          onClick={() => setIsSettingsModalOpen(true)}
+        >
+          ⚙
+        </button>
+      )}
+
+      {isModalShowing && (
         <SettingsModal
           setIsSettingsOpen={setIsSettingsModalOpen}
           state={gameState}
@@ -78,6 +103,8 @@ export default function GamePage() {
           leaveRoom={handleLeaveRoom}
           updateSettings={handleUpdateSettings}
           reorderPlayers={handleReorderPlayers}
+          pauseGame={handlePauseGame}
+          resumeGame={handleResumeGame}
         />
       )}
     </>
