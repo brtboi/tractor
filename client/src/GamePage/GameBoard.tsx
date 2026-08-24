@@ -14,6 +14,7 @@ import {
   skipAsk,
   overturnTrump,
   playTrick,
+  finishBreaking,
 } from "../services/gameActions";
 import {
   getSeatOrientation,
@@ -70,7 +71,24 @@ export default function GameBoard() {
 
   const actions: ActionDescriptor[] = [];
 
-  if (currentRound.phase === "drawing") {
+  if (currentRound.phase === "breaking") {
+    // the breaker is whoever sits right before the dealer (onPlayer)
+    const { playerOrder } = gameState;
+    const breakerId =
+      playerOrder[
+        (playerOrder.indexOf(currentRound.onPlayer) -
+          1 +
+          playerOrder.length) %
+          playerOrder.length
+      ];
+    if (breakerId === playerId) {
+      actions.push({
+        id: "finish-breaking",
+        label: "Finish Breaking",
+        onClick: () => runAction(() => finishBreaking(roomId)),
+      });
+    }
+  } else if (currentRound.phase === "drawing") {
     if (currentRound.currentTurn === playerId) {
       actions.push({
         id: "draw",
@@ -117,7 +135,8 @@ export default function GameBoard() {
         ),
     });
   } else if (
-    currentRound.phase === "asking" &&
+    (currentRound.phase === "asking" ||
+      currentRound.phase === "asking_before_bottoming") &&
     currentRound.currentTurn === playerId
   ) {
     actions.push({

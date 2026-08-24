@@ -23,12 +23,35 @@ export function renamePlayer(
   return socket.emitWithAck("RENAME_PLAYER", { roomId, newName });
 }
 
+export function renameTeam(
+  roomId: string,
+  teamIndex: number,
+  newName: string,
+): Promise<AckResult> {
+  return socket.emitWithAck("RENAME_TEAM", { roomId, teamIndex, newName });
+}
+
+export function reorderPlayers(
+  roomId: string,
+  newPlayerOrder: string[],
+): Promise<AckResult> {
+  return socket.emitWithAck("REORDER_PLAYERS", { roomId, newPlayerOrder });
+}
+
 export function startGame(roomId: string): Promise<AckResult> {
   return socket.emitWithAck("START_GAME", { roomId });
 }
 
 export function startTestGame(roomId: string): Promise<AckResult> {
   return socket.emitWithAck("START_TEST_GAME", { roomId });
+}
+
+export function breakDeck(roomId: string, breakAt: number): Promise<AckResult> {
+  return socket.emitWithAck("BREAK_DECK", { roomId, breakAt });
+}
+
+export function finishBreaking(roomId: string): Promise<AckResult> {
+  return socket.emitWithAck("FINISH_BREAKING", { roomId });
 }
 
 export function playTrick(roomId: string, trick: Card[]): Promise<AckResult> {

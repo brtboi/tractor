@@ -40,9 +40,9 @@ export default function GamePage() {
 
   return (
     <>
-      <GameBoard />
+      {gameState.currentRound && <GameBoard />}
 
-      {(isSettingsModalOpen || gameState?.phase === "waiting") && (
+      {(isSettingsModalOpen || gameState.phase === "waiting_start") && (
         <SettingsModal
           setIsSettingsOpen={setIsSettingsModalOpen}
           state={gameState}

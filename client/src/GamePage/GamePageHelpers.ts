@@ -65,5 +65,6 @@ export const PHASE_LABELS: Record<string, string> = {
   drawing: "Drawing",
   bottoming: "Bottoming",
   asking: "Asking",
+  asking_before_bottoming: "Final Call",
   playing: "Playing",
 };
