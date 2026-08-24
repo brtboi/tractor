@@ -21,6 +21,8 @@ import {
   renamePlayer,
   renameTeam,
   updateSettings,
+  pauseGame,
+  resumeGame,
   reorderPlayers,
   breakDeck,
   finishBreaking,
@@ -61,8 +63,13 @@ function getPlayerId(
 
 function broadcastState(roomId: string) {
   const state = rooms[roomId];
-  Object.keys(state.players).forEach((playerId) => {
-    io.to(playerId).emit("GAME_STATE", stateForPlayer(state, playerId));
+  Object.values(state.players).forEach((player) => {
+    // inactive seats belong to players who explicitly left mid-game - they
+    // already reset their own client locally, so don't push them updates
+    // (this targets their personal room, not roomId, so leaving the room
+    // alone doesn't stop it)
+    if (!player.active) return;
+    io.to(player.id).emit("GAME_STATE", stateForPlayer(state, player.id));
   });
 }
 
@@ -111,7 +118,7 @@ io.on("connection", (socket) => {
     try {
       const playerId = getPlayerId(socket);
       if (!rooms[roomId]) throw new ServerError("ROOM_NOT_FOUND");
-      if (!rooms[roomId].players[playerId]) {
+      if (!rooms[roomId].players[playerId]?.active) {
         rooms[roomId] = addPlayer(rooms[roomId], playerId, name || playerId);
       }
 
@@ -193,6 +200,32 @@ io.on("connection", (socket) => {
       const playerId = getPlayerId(socket);
       if (!rooms[roomId]) throw new ServerError("ROOM_NOT_FOUND");
       rooms[roomId] = updateSettings(rooms[roomId], playerId, settings);
+      broadcastState(roomId);
+
+      ack({ ok: true });
+    } catch (e: unknown) {
+      ack(toAckResult(e));
+    }
+  });
+
+  socket.on("PAUSE_GAME", async ({ roomId }, ack) => {
+    try {
+      const playerId = getPlayerId(socket);
+      if (!rooms[roomId]) throw new ServerError("ROOM_NOT_FOUND");
+      rooms[roomId] = pauseGame(rooms[roomId], playerId);
+      broadcastState(roomId);
+
+      ack({ ok: true });
+    } catch (e: unknown) {
+      ack(toAckResult(e));
+    }
+  });
+
+  socket.on("RESUME_GAME", async ({ roomId }, ack) => {
+    try {
+      const playerId = getPlayerId(socket);
+      if (!rooms[roomId]) throw new ServerError("ROOM_NOT_FOUND");
+      rooms[roomId] = resumeGame(rooms[roomId], playerId);
       broadcastState(roomId);
 
       ack({ ok: true });

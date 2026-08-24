@@ -42,6 +42,14 @@ export type ClientToServerEvents = {
     payload: { roomId: string; settings: Partial<GameSettings> },
     ack: (res: AckResult) => void,
   ) => void;
+  PAUSE_GAME: (
+    payload: { roomId: string },
+    ack: (res: AckResult) => void,
+  ) => void;
+  RESUME_GAME: (
+    payload: { roomId: string },
+    ack: (res: AckResult) => void,
+  ) => void;
   START_GAME: (
     payload: { roomId: string },
     ack: (res: AckResult) => void,
@@ -130,5 +138,7 @@ export type ErrorCode =
   | "INVALID_BOTTOM"
   | "INVALID_TRICK"
   | "INVALID_SETTINGS"
+  | "GAME_PAUSED"
+  | "SEAT_VACANT"
   | "PLAYER_NOT_IN_ROOM"
   | "UNKNOWN_ERROR";

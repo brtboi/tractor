@@ -27,6 +27,9 @@ export type Card = {
 export type Player = {
   id: string;
   name: string;
+  // false while this seat is vacant (its original occupant left mid-game
+  // and hasn't been replaced yet) - still holds their seat/team/hand
+  active: boolean;
 };
 
 export type TrickSequence = {
@@ -95,6 +98,7 @@ export type GameState = {
   players: Record<string, Player>; // player ID -> Player
   playerOrder: string[]; // player IDs in seating order
   hostId: string | null; // only the host can reorder players, change settings, etc
+  paused: boolean; // true while a seat is vacant, or the host paused manually
   teams: Team[];
 
   currentRoundNumber: number; // 0 index

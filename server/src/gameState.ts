@@ -28,6 +28,7 @@ function requireRound(
 ): RoundState {
   const round = state.currentRound;
   if (!round) throw new ServerError("NO_ACTIVE_ROUND");
+  if (state.paused) throw new ServerError("GAME_PAUSED");
 
   if (expectedPhase) {
     const allowed = Array.isArray(expectedPhase)
@@ -83,6 +84,7 @@ export function createRoom(roomId: string): GameState {
     players: {},
     playerOrder: [],
     hostId: null,
+    paused: false,
     teams: [
       {
         name: "team 0",
@@ -105,43 +107,147 @@ export function createRoom(roomId: string): GameState {
   };
 }
 
+/**
+ * Moves a seat's identity from oldId to newId: playerOrder, players, team
+ * membership, and (if a round is in progress) hands/discards and every
+ * round-level playerId reference. Used when a new player takes over a seat
+ * vacated by someone who left mid-game - they inherit that seat's team,
+ * cards, and turn position exactly as they were.
+ *
+ * oldId === newId is the "same player reconnecting to their own vacant
+ * seat" case - nothing needs to move, just flip them back to active.
+ */
+function replaceSeat(
+  draft: GameState,
+  oldId: string,
+  newId: string,
+  newName: string,
+): void {
+  if (oldId === newId) {
+    draft.players[newId].active = true;
+    draft.players[newId].name = newName;
+    return;
+  }
+
+  const idx = draft.playerOrder.indexOf(oldId);
+  draft.playerOrder[idx] = newId;
+  delete draft.players[oldId];
+  draft.players[newId] = { id: newId, name: newName, active: true };
+
+  for (const team of draft.teams) {
+    const teamIdx = team.playerIds.indexOf(oldId);
+    if (teamIdx !== -1) team.playerIds[teamIdx] = newId;
+  }
+
+  const round = draft.currentRound;
+  if (round) {
+    round.hands[newId] = round.hands[oldId] ?? [];
+    delete round.hands[oldId];
+    round.discards[newId] = round.discards[oldId] ?? [];
+    delete round.discards[oldId];
+
+    if (round.onPlayer === oldId) round.onPlayer = newId;
+    if (round.bottomPlayer === oldId) round.bottomPlayer = newId;
+    if (round.callPlayer === oldId) round.callPlayer = newId;
+    if (round.currentTurn === oldId) round.currentTurn = newId;
+
+    round.currentTricks = round.currentTricks.map((t) =>
+      t.playerId === oldId ? { ...t, playerId: newId } : t,
+    );
+  }
+}
+
 export function addPlayer(
   prev: GameState,
   playerId: string,
   playerName: string,
 ): GameState {
-  if (prev.phase !== "waiting_start")
-    throw new ServerError("GAME_ALREADY_STARTED");
+  if (prev.phase !== "waiting_start") {
+    // game already started: the only way in is taking over a vacant seat
+    // (someone who left mid-game, or your own seat after reconnecting)
+    const vacantId = prev.playerOrder.find((id) => !prev.players[id]?.active);
+    if (!vacantId) throw new ServerError("GAME_ALREADY_STARTED");
+
+    return produce(prev, (draft) => {
+      replaceSeat(draft, vacantId, playerId, playerName);
+      // resume automatically once every seat is filled again
+      if (draft.playerOrder.every((id) => draft.players[id].active))
+        draft.paused = false;
+    });
+  }
+
   if (prev.playerOrder.length >= 4) throw new ServerError("ROOM_FULL");
 
   return produce(prev, (draft) => {
     if (draft.playerOrder.length === 0) draft.hostId = playerId;
     draft.playerOrder.push(playerId);
-    draft.players[playerId] = { id: playerId, name: playerName };
+    draft.players[playerId] = { id: playerId, name: playerName, active: true };
   });
 }
 
 export function removePlayer(prev: GameState, playerId: string): GameState {
   if (!prev.players[playerId]) throw new ServerError("PLAYER_NOT_FOUND");
-  // the round engine has no notion of a player disappearing mid-round, so
-  // leaving is only supported before the game starts
-  if (prev.phase !== "waiting_start")
-    throw new ServerError("GAME_ALREADY_STARTED");
+
+  if (prev.phase === "waiting_start") {
+    return produce(prev, (draft) => {
+      draft.playerOrder = draft.playerOrder.filter((id) => id !== playerId);
+      delete draft.players[playerId];
+
+      // re-pair teams (seats 0&2 vs 1&3) from what's left of the seating order
+      draft.teams[0].playerIds = [
+        draft.playerOrder[0],
+        draft.playerOrder[2],
+      ].filter((id): id is string => !!id);
+      draft.teams[1].playerIds = [
+        draft.playerOrder[1],
+        draft.playerOrder[3],
+      ].filter((id): id is string => !!id);
+
+      // hand the host title to the next player in line if the host left
+      if (draft.hostId === playerId)
+        draft.hostId = draft.playerOrder[0] ?? null;
+    });
+  }
+
+  // mid-game: the round engine has no notion of a seat disappearing, so
+  // instead of removing them we mark the seat vacant and pause - their
+  // position, team, and hand stay put for whoever takes over the seat next
+  if (!prev.players[playerId].active) return prev;
 
   return produce(prev, (draft) => {
-    draft.playerOrder = draft.playerOrder.filter((id) => id !== playerId);
-    delete draft.players[playerId];
+    draft.players[playerId].active = false;
+    draft.paused = true;
 
-    // re-pair teams (seats 0&2 vs 1&3) from what's left of the seating order
-    draft.teams[0].playerIds = [draft.playerOrder[0], draft.playerOrder[2]].filter(
-      (id): id is string => !!id,
-    );
-    draft.teams[1].playerIds = [draft.playerOrder[1], draft.playerOrder[3]].filter(
-      (id): id is string => !!id,
+    if (draft.hostId === playerId) {
+      draft.hostId =
+        draft.playerOrder.find(
+          (id) => id !== playerId && draft.players[id].active,
+        ) ?? null;
+    }
+  });
+}
+
+export function pauseGame(prev: GameState, playerId: string): GameState {
+  requireHost(prev, playerId);
+  if (!prev.currentRound) throw new ServerError("NO_ACTIVE_ROUND");
+  if (prev.paused) return prev;
+
+  return produce(prev, (draft) => {
+    draft.paused = true;
+  });
+}
+
+export function resumeGame(prev: GameState, playerId: string): GameState {
+  requireHost(prev, playerId);
+  if (!prev.paused) return prev;
+  if (prev.playerOrder.some((id) => !prev.players[id].active))
+    throw new ServerError(
+      "SEAT_VACANT",
+      "cannot resume while a seat is still vacant",
     );
 
-    // hand the host title to the next player in line if the host left
-    if (draft.hostId === playerId) draft.hostId = draft.playerOrder[0] ?? null;
+  return produce(prev, (draft) => {
+    draft.paused = false;
   });
 }
 
