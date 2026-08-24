@@ -649,19 +649,45 @@ export function playTrick(
   });
 }
 
-// TODO: Filter state so a player only sees their own hand
-export function stateForPlayer(state: GameState, playerId: string) {
-  // TODO: remember to give bottom eight to correct person
-  // show everyone bottom eight if game phase is waiting next round
+// stand-in for a card whose identity must stay hidden from this player;
+// array length (card count) is preserved, only the identity is scrubbed.
+// safe to use anywhere since face-down rendering never reads card identity.
+const HIDDEN_CARD: Card = { deck: 0, suit: "Spades", rank: 2 };
 
-  // when currentRound.isFinalCall is true, trumpSuit was determined by
-  // round.bottom[2] (nobody called trump for the whole round, so the third
-  // card of the bottom eight was revealed to set trump). trumpSuit itself is
-  // already safe to send to everyone at that point, but round.bottom as a
-  // whole should still stay hidden from non-bottomPlayer players (besides
-  // that one revealed card) until the round reaches "waiting_next_round" -
-  // so here, if isFinalCall is true and playerId !== bottomPlayer, send only
-  // round.bottom[2] (e.g. as a single-card array) instead of the full bottom.
+export function stateForPlayer(state: GameState, playerId: string): GameState {
+  const round = state.currentRound;
+  if (!round) return state;
 
-  return state;
+  return produce(state, (draft) => {
+    const draftRound = draft.currentRound!;
+
+    // hands: only your own is visible; others are scrubbed but keep their
+    // length so opponents' card counts are still visible
+    for (const id of Object.keys(draftRound.hands)) {
+      if (id === playerId) continue;
+      draftRound.hands[id] = draftRound.hands[id].map(() => HIDDEN_CARD);
+    }
+
+    // discards: your own full history is visible; for everyone else, only
+    // the most recently discarded trick is visible (mirrors a real table,
+    // where older discards get buried under the pile)
+    for (const id of Object.keys(draftRound.discards)) {
+      if (id === playerId) continue;
+      const tricks = draftRound.discards[id];
+      draftRound.discards[id] =
+        tricks.length > 0 ? [tricks[tricks.length - 1]] : [];
+    }
+
+    // bottom: hidden from everyone except whoever is bottoming, except for
+    // bottom[2] once isFinalCall reveals it (nobody called trump, so that
+    // card was flipped to decide trump and is public knowledge)
+    if (playerId !== draftRound.bottomPlayer) {
+      draftRound.bottom = draftRound.bottom.map((card, i) =>
+        draftRound.isFinalCall && i === 2 ? card : HIDDEN_CARD,
+      );
+    }
+
+    // currentTricks, points, callCards/callPlayer are all public information
+    // already and need no filtering
+  });
 }

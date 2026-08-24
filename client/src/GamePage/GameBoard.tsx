@@ -206,7 +206,7 @@ export default function GameBoard() {
               </span>
               <CardHand
                 cards={currentRound.hands[id] ?? []}
-                isFaceDown={false}
+                isFaceDown={true}
                 orientation={orientation}
                 isSelectable={false}
               />
