@@ -1,4 +1,4 @@
-import { Card, GameState } from "./gameTypes.js";
+import { Card, GameSettings, GameState } from "./gameTypes.js";
 
 export type AckResult =
   | { ok: true }
@@ -36,6 +36,10 @@ export type ClientToServerEvents = {
   ) => void;
   REORDER_PLAYERS: (
     payload: { roomId: string; newPlayerOrder: string[] },
+    ack: (res: AckResult) => void,
+  ) => void;
+  UPDATE_SETTINGS: (
+    payload: { roomId: string; settings: Partial<GameSettings> },
     ack: (res: AckResult) => void,
   ) => void;
   START_GAME: (
@@ -124,5 +128,6 @@ export type ErrorCode =
   | "INVALID_CALL"
   | "INVALID_BOTTOM"
   | "INVALID_TRICK"
+  | "INVALID_SETTINGS"
   | "PLAYER_NOT_IN_ROOM"
   | "UNKNOWN_ERROR";

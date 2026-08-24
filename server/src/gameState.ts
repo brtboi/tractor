@@ -5,6 +5,7 @@ import {
   RoundPhase,
   RoundState,
   GameState,
+  GameSettings,
   Rank,
   ServerError,
   compareTricks,
@@ -153,6 +154,41 @@ export function renameTeam(
     );
   return produce(prev, (draft) => {
     draft.teams[teamIndex].name = newName;
+  });
+}
+
+export function updateSettings(
+  prev: GameState,
+  playerId: string,
+  settings: Partial<GameSettings>,
+): GameState {
+  if (!prev.players[playerId]) throw new ServerError("PLAYER_NOT_FOUND");
+  if (prev.phase !== "waiting_start")
+    throw new ServerError("GAME_ALREADY_STARTED");
+
+  if (settings.mustPlay !== undefined) {
+    if (
+      settings.mustPlay.length !== 15 ||
+      settings.mustPlay.some((v) => v !== 0 && v !== 1 && v !== 2)
+    )
+      throw new ServerError(
+        "INVALID_SETTINGS",
+        "mustPlay must have length 15 with values 0, 1, or 2",
+      );
+  }
+  if (settings.maxScoreJump !== undefined) {
+    if (!Number.isInteger(settings.maxScoreJump) || settings.maxScoreJump < 1)
+      throw new ServerError(
+        "INVALID_SETTINGS",
+        "maxScoreJump must be a positive integer",
+      );
+  }
+
+  return produce(prev, (draft) => {
+    if (settings.mustPlay !== undefined)
+      draft.settings.mustPlay = settings.mustPlay;
+    if (settings.maxScoreJump !== undefined)
+      draft.settings.maxScoreJump = settings.maxScoreJump;
   });
 }
 

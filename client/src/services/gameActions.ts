@@ -1,4 +1,4 @@
-import type { Card, AckResult } from "@tractor/shared";
+import type { Card, AckResult, GameSettings } from "@tractor/shared";
 import socket from "./socket";
 
 export function createRoom(name: string = ""): Promise<AckResult> {
@@ -40,6 +40,13 @@ export function reorderPlayers(
   newPlayerOrder: string[],
 ): Promise<AckResult> {
   return socket.emitWithAck("REORDER_PLAYERS", { roomId, newPlayerOrder });
+}
+
+export function updateSettings(
+  roomId: string,
+  settings: Partial<GameSettings>,
+): Promise<AckResult> {
+  return socket.emitWithAck("UPDATE_SETTINGS", { roomId, settings });
 }
 
 export function startGame(roomId: string): Promise<AckResult> {

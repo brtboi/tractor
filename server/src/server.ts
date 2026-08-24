@@ -19,6 +19,7 @@ import {
   playTrick,
   renamePlayer,
   renameTeam,
+  updateSettings,
   reorderPlayers,
   breakDeck,
   finishBreaking,
@@ -176,6 +177,19 @@ io.on("connection", (socket) => {
       const playerId = getPlayerId(socket);
       if (!rooms[roomId]) throw new ServerError("ROOM_NOT_FOUND");
       rooms[roomId] = renameTeam(rooms[roomId], playerId, teamIndex, newName);
+      broadcastState(roomId);
+
+      ack({ ok: true });
+    } catch (e: unknown) {
+      ack(toAckResult(e));
+    }
+  });
+
+  socket.on("UPDATE_SETTINGS", async ({ roomId, settings }, ack) => {
+    try {
+      const playerId = getPlayerId(socket);
+      if (!rooms[roomId]) throw new ServerError("ROOM_NOT_FOUND");
+      rooms[roomId] = updateSettings(rooms[roomId], playerId, settings);
       broadcastState(roomId);
 
       ack({ ok: true });

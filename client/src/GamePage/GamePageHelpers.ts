@@ -68,3 +68,20 @@ export const PHASE_LABELS: Record<string, string> = {
   asking_before_bottoming: "Final Call",
   playing: "Playing",
 };
+
+// score levels 2-14, the range mustPlay/hasPlayed actually track
+export const LEVEL_LABELS: Record<number, string> = {
+  2: "2",
+  3: "3",
+  4: "4",
+  5: "5",
+  6: "6",
+  7: "7",
+  8: "8",
+  9: "9",
+  10: "10",
+  11: "J",
+  12: "Q",
+  13: "K",
+  14: "A",
+};

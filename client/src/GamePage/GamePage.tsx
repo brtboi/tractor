@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import type { GameSettings } from "@tractor/shared";
 import { useGameSocket } from "../services/useGameSocket";
 import SettingsModal from "./SettingsModal";
 import GameBoard from "./GameBoard";
@@ -8,6 +9,7 @@ import {
   leaveRoom,
   renamePlayer,
   startTestGame,
+  updateSettings,
 } from "../services/gameActions";
 
 export default function GamePage() {
@@ -39,6 +41,11 @@ export default function GamePage() {
     navigate("/");
   };
 
+  const handleUpdateSettings = async (settings: Partial<GameSettings>) => {
+    const res = await updateSettings(gameState.roomId, settings);
+    if (!res.ok) pushError(res.error);
+  };
+
   const handleStartTestGame = async () => {
     const res = await startTestGame(gameState.roomId);
     if (res.ok) {
@@ -63,6 +70,7 @@ export default function GamePage() {
           addGhostPlayer={handleAddGhostPlayer}
           startGame={handleStartTestGame}
           leaveRoom={handleLeaveRoom}
+          updateSettings={handleUpdateSettings}
         />
       )}
     </>
