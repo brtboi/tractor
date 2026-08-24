@@ -13,6 +13,7 @@ type Props = {
   startGame: () => void;
   leaveRoom: () => void;
   updateSettings: (settings: Partial<GameSettings>) => void;
+  reorderPlayers: (newPlayerOrder: string[]) => void;
   // TODO: endGame: () => void;
 };
 
@@ -30,12 +31,23 @@ export default function SettingsModal({
   startGame,
   leaveRoom,
   updateSettings,
+  reorderPlayers,
 }: Props) {
   const [playerName, setPlayerName] = useState<string>(
     state.players[playerId].name,
   );
 
   const [gameCodeCopied, setGameCodeCopied] = useState<boolean>(false);
+
+  const isHost = state.hostId === playerId;
+
+  const handleMovePlayer = (index: number, direction: -1 | 1) => {
+    const target = index + direction;
+    if (target < 0 || target >= state.playerOrder.length) return;
+    const newOrder = [...state.playerOrder];
+    [newOrder[index], newOrder[target]] = [newOrder[target], newOrder[index]];
+    reorderPlayers(newOrder);
+  };
 
   const handleGameCodeCopy = async () => {
     try {
@@ -75,6 +87,7 @@ export default function SettingsModal({
                     {MUST_PLAY_OPTIONS.map(({ value, label }) => (
                       <button
                         key={label}
+                        disabled={!isHost}
                         className={clsx(
                           styles.mustPlayOption,
                           state.settings.mustPlay[level] === value &&
@@ -125,12 +138,40 @@ export default function SettingsModal({
             </div>
             <div className={styles.playerList}>
               <div>Players:</div>
-              {Object.entries(state.players).map(([playerId, player]) => (
-                <div key={playerId}>{player.name}</div>
+              {state.playerOrder.map((id, index) => (
+                <div key={id} className={styles.playerRow}>
+                  <span>
+                    {state.players[id]?.name ?? id}
+                    {id === state.hostId ? " (host)" : ""}
+                  </span>
+                  <span className={styles.teamLabel}>
+                    Team {(index % 2) + 1}
+                  </span>
+                  {isHost && (
+                    <span className={styles.reorderButtons}>
+                      <button
+                        disabled={index === 0}
+                        onClick={() => handleMovePlayer(index, -1)}
+                      >
+                        ↑
+                      </button>
+                      <button
+                        disabled={index === state.playerOrder.length - 1}
+                        onClick={() => handleMovePlayer(index, 1)}
+                      >
+                        ↓
+                      </button>
+                    </span>
+                  )}
+                </div>
               ))}
             </div>
-            <button onClick={addGhostPlayer}>ADD GHOST PLAYER</button>
-            <button onClick={startGame}>START GMAE</button>
+            <button disabled={!isHost} onClick={addGhostPlayer}>
+              ADD GHOST PLAYER
+            </button>
+            <button disabled={!isHost} onClick={startGame}>
+              START GMAE
+            </button>
             <button onClick={leaveRoom}>LEAVE ROOM</button>
           </div>
         </div>

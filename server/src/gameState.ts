@@ -62,6 +62,18 @@ function getTeam(playerId: string, teams: Team[]) {
   return teams.findIndex((team) => team.playerIds.includes(playerId));
 }
 
+/**
+ * Asserts the given player is the room host. Only the host can reorder
+ * players, change settings, add ghost players, or start the game.
+ */
+export function requireHost(state: GameState, playerId: string): void {
+  if (state.hostId !== playerId)
+    throw new ServerError(
+      "NOT_HOST",
+      `expected host ${state.hostId}, found ${playerId}`,
+    );
+}
+
 export function createRoom(roomId: string): GameState {
   return {
     roomId,
@@ -70,6 +82,7 @@ export function createRoom(roomId: string): GameState {
     currentRoundNumber: 0,
     players: {},
     playerOrder: [],
+    hostId: null,
     teams: [
       {
         name: "team 0",
@@ -102,6 +115,7 @@ export function addPlayer(
   if (prev.playerOrder.length >= 4) throw new ServerError("ROOM_FULL");
 
   return produce(prev, (draft) => {
+    if (draft.playerOrder.length === 0) draft.hostId = playerId;
     draft.playerOrder.push(playerId);
     draft.players[playerId] = { id: playerId, name: playerName };
   });
@@ -125,6 +139,9 @@ export function removePlayer(prev: GameState, playerId: string): GameState {
     draft.teams[1].playerIds = [draft.playerOrder[1], draft.playerOrder[3]].filter(
       (id): id is string => !!id,
     );
+
+    // hand the host title to the next player in line if the host left
+    if (draft.hostId === playerId) draft.hostId = draft.playerOrder[0] ?? null;
   });
 }
 
@@ -163,6 +180,7 @@ export function updateSettings(
   settings: Partial<GameSettings>,
 ): GameState {
   if (!prev.players[playerId]) throw new ServerError("PLAYER_NOT_FOUND");
+  requireHost(prev, playerId);
   if (prev.phase !== "waiting_start")
     throw new ServerError("GAME_ALREADY_STARTED");
 
@@ -194,8 +212,10 @@ export function updateSettings(
 
 export function reorderPlayers(
   prev: GameState,
+  playerId: string,
   newPlayerOrder: string[],
 ): GameState {
+  requireHost(prev, playerId);
   if (prev.phase !== "waiting_start")
     throw new ServerError("GAME_ALREADY_STARTED");
   if (newPlayerOrder.length !== prev.playerOrder.length)
@@ -240,7 +260,8 @@ function newRound(
   };
 }
 
-export function startTestGame(prev: GameState): GameState {
+export function startTestGame(prev: GameState, playerId: string): GameState {
+  requireHost(prev, playerId);
   if (prev.phase !== "waiting_start")
     throw new ServerError("GAME_ALREADY_STARTED");
   if (prev.playerOrder.length !== 4)
@@ -261,7 +282,8 @@ export function startTestGame(prev: GameState): GameState {
   });
 }
 
-export function startGame(prev: GameState): GameState {
+export function startGame(prev: GameState, playerId: string): GameState {
+  requireHost(prev, playerId);
   throw new ServerError(
     "FEATURE_NOT_IMPLEMENTED",
     "startGame not implemented, please use startTestGame",

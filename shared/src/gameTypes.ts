@@ -94,6 +94,7 @@ export type GameState = {
   winner: number; // -1 for null
   players: Record<string, Player>; // player ID -> Player
   playerOrder: string[]; // player IDs in seating order
+  hostId: string | null; // only the host can reorder players, change settings, etc
   teams: Team[];
 
   currentRoundNumber: number; // 0 index

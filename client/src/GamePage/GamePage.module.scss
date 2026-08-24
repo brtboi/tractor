@@ -397,12 +397,33 @@
         border: white 2px solid;
         border-radius: $border-radius-md;
 
-        * {
+        > * {
           padding: 0.5rem;
         }
 
-        *:not(:last-child) {
+        > *:not(:last-child) {
           border-bottom: white 2px solid;
+        }
+
+        .playerRow {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 0.5rem;
+
+          .teamLabel {
+            opacity: 0.7;
+            font-size: 0.85em;
+          }
+
+          .reorderButtons {
+            display: flex;
+            gap: 0.25rem;
+
+            button {
+              padding: 0 0.4rem;
+            }
+          }
         }
       }
     }

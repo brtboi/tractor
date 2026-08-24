@@ -8,6 +8,7 @@ import {
   addGhostPlayer,
   leaveRoom,
   renamePlayer,
+  reorderPlayers,
   startTestGame,
   updateSettings,
 } from "../services/gameActions";
@@ -46,6 +47,11 @@ export default function GamePage() {
     if (!res.ok) pushError(res.error);
   };
 
+  const handleReorderPlayers = async (newPlayerOrder: string[]) => {
+    const res = await reorderPlayers(gameState.roomId, newPlayerOrder);
+    if (!res.ok) pushError(res.error);
+  };
+
   const handleStartTestGame = async () => {
     const res = await startTestGame(gameState.roomId);
     if (res.ok) {
@@ -71,6 +77,7 @@ export default function GamePage() {
           startGame={handleStartTestGame}
           leaveRoom={handleLeaveRoom}
           updateSettings={handleUpdateSettings}
+          reorderPlayers={handleReorderPlayers}
         />
       )}
     </>

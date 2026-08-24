@@ -13,6 +13,7 @@ import {
   createRoom,
   addPlayer,
   removePlayer,
+  requireHost,
   startGame,
   startTestGame,
   stateForPlayer,
@@ -126,7 +127,9 @@ io.on("connection", (socket) => {
 
   socket.on("ADD_GHOST_PLAYER", async ({ roomId }, ack) => {
     try {
+      const playerId = getPlayerId(socket);
       if (!rooms[roomId]) throw new ServerError("ROOM_NOT_FOUND");
+      requireHost(rooms[roomId], playerId);
       rooms[roomId] = addPlayer(
         rooms[roomId],
         Math.random().toString(36).slice(2, 7).toUpperCase(),
@@ -200,8 +203,9 @@ io.on("connection", (socket) => {
 
   socket.on("REORDER_PLAYERS", async ({ roomId, newPlayerOrder }, ack) => {
     try {
+      const playerId = getPlayerId(socket);
       if (!rooms[roomId]) throw new ServerError("ROOM_NOT_FOUND");
-      rooms[roomId] = reorderPlayers(rooms[roomId], newPlayerOrder);
+      rooms[roomId] = reorderPlayers(rooms[roomId], playerId, newPlayerOrder);
       broadcastState(roomId);
 
       ack({ ok: true });
@@ -212,7 +216,9 @@ io.on("connection", (socket) => {
 
   socket.on("START_GAME", async ({ roomId }, ack) => {
     try {
-      rooms[roomId] = startGame(rooms[roomId]);
+      const playerId = getPlayerId(socket);
+      if (!rooms[roomId]) throw new ServerError("ROOM_NOT_FOUND");
+      rooms[roomId] = startGame(rooms[roomId], playerId);
       broadcastState(roomId);
       ack({ ok: true });
     } catch (e: unknown) {
@@ -222,7 +228,9 @@ io.on("connection", (socket) => {
 
   socket.on("START_TEST_GAME", async ({ roomId }, ack) => {
     try {
-      rooms[roomId] = startTestGame(rooms[roomId]);
+      const playerId = getPlayerId(socket);
+      if (!rooms[roomId]) throw new ServerError("ROOM_NOT_FOUND");
+      rooms[roomId] = startTestGame(rooms[roomId], playerId);
       broadcastState(roomId);
       ack({ ok: true });
     } catch (e: unknown) {
