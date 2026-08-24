@@ -1,15 +1,18 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useGameSocket } from "../services/useGameSocket";
 import SettingsModal from "./SettingsModal";
 import GameBoard from "./GameBoard";
 import {
   addGhostPlayer,
+  leaveRoom,
   renamePlayer,
   startTestGame,
 } from "../services/gameActions";
 
 export default function GamePage() {
-  const { playerId, gameState, pushError } = useGameSocket();
+  const { playerId, gameState, pushError, resetGameState } = useGameSocket();
+  const navigate = useNavigate();
   const [isSettingsModalOpen, setIsSettingsModalOpen] =
     useState<boolean>(false);
 
@@ -25,6 +28,15 @@ export default function GamePage() {
   const handleAddGhostPlayer = async () => {
     const res = await addGhostPlayer(gameState.roomId);
     if (!res.ok) pushError(res.error);
+  };
+
+  const handleLeaveRoom = async () => {
+    // leaving needs to work even if the server can't confirm it (stale
+    // room, dropped connection) - clear local state regardless of the ack
+    const res = await leaveRoom(gameState.roomId);
+    if (!res.ok) pushError(res.error);
+    resetGameState();
+    navigate("/");
   };
 
   const handleStartTestGame = async () => {
@@ -50,6 +62,7 @@ export default function GamePage() {
           changeName={changeName}
           addGhostPlayer={handleAddGhostPlayer}
           startGame={handleStartTestGame}
+          leaveRoom={handleLeaveRoom}
         />
       )}
     </>

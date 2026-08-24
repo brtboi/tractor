@@ -9,6 +9,7 @@ type Props = {
   changeName: (newName: string) => void;
   addGhostPlayer: () => void;
   startGame: () => void;
+  leaveRoom: () => void;
   // TODO: endGame: () => void;
 };
 
@@ -18,6 +19,7 @@ export default function SettingsModal({
   changeName,
   addGhostPlayer,
   startGame,
+  leaveRoom,
 }: Props) {
   const [playerName, setPlayerName] = useState<string>(
     state.players[playerId].name,
@@ -89,6 +91,7 @@ export default function SettingsModal({
             </div>
             <button onClick={addGhostPlayer}>ADD GHOST PLAYER</button>
             <button onClick={startGame}>START GMAE</button>
+            <button onClick={leaveRoom}>LEAVE ROOM</button>
           </div>
         </div>
       </div>

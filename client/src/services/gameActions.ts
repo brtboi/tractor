@@ -16,6 +16,10 @@ export function addGhostPlayer(roomId: string): Promise<AckResult> {
   return socket.emitWithAck("ADD_GHOST_PLAYER", { roomId });
 }
 
+export function leaveRoom(roomId: string): Promise<AckResult> {
+  return socket.emitWithAck("LEAVE_ROOM", { roomId });
+}
+
 export function renamePlayer(
   roomId: string,
   newName: string,

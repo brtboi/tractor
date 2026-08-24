@@ -8,6 +8,7 @@ interface SocketContextValue {
   errors: string[];
   pushError: (message: string) => void;
   dismissError: (index: number) => void;
+  resetGameState: () => void;
 }
 
 export const SocketContext = createContext<SocketContextValue | null>(null);

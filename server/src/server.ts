@@ -12,6 +12,7 @@ import {
 import {
   createRoom,
   addPlayer,
+  removePlayer,
   startGame,
   startTestGame,
   stateForPlayer,
@@ -138,7 +139,20 @@ io.on("connection", (socket) => {
     }
   });
 
-  // TODO: Leave room
+  socket.on("LEAVE_ROOM", async ({ roomId }, ack) => {
+    try {
+      const playerId = getPlayerId(socket);
+      if (!rooms[roomId]) throw new ServerError("ROOM_NOT_FOUND");
+      rooms[roomId] = removePlayer(rooms[roomId], playerId);
+      delete playerToRoom[playerId];
+      socket.leave(roomId);
+      broadcastState(roomId);
+
+      ack({ ok: true });
+    } catch (e: unknown) {
+      ack(toAckResult(e));
+    }
+  });
 
   socket.on("RENAME_PLAYER", async ({ roomId, newName }, ack) => {
     try {

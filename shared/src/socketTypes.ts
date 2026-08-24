@@ -22,6 +22,10 @@ export type ClientToServerEvents = {
     payload: { roomId: string },
     ack: (res: AckResult) => void,
   ) => void;
+  LEAVE_ROOM: (
+    payload: { roomId: string },
+    ack: (res: AckResult) => void,
+  ) => void;
   RENAME_PLAYER: (
     payload: { roomId: string; newName: string },
     ack: (res: AckResult) => void,

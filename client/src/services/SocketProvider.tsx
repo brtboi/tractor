@@ -12,6 +12,14 @@ function getPlayerId(): string {
   return id;
 }
 
+function cacheRoomId(roomId: string): void {
+  localStorage.setItem("ROOM_ID", roomId);
+}
+
+function clearCachedRoomId(): void {
+  localStorage.removeItem("ROOM_ID");
+}
+
 export function SocketProvider({ children }: { children: ReactNode }) {
   const [playerId] = useState<string>(getPlayerId());
   const [isRegistered, setIsRegistered] = useState(false);
@@ -26,7 +34,19 @@ export function SocketProvider({ children }: { children: ReactNode }) {
     setErrors((prev) => prev.filter((_, i) => i !== index));
   }, []);
 
+  // leaving a room needs to work locally even if the server never responds
+  // (stale room, dropped connection, etc.) - this always wins client-side
+  const resetGameState = useCallback(() => {
+    clearCachedRoomId();
+    setGameState(null);
+  }, []);
+
   useEffect(() => {
+    const applyGameState = (state: GameState) => {
+      cacheRoomId(state.roomId);
+      setGameState(state);
+    };
+
     const handleConnect = async () => {
       const res = await socket.emitWithAck("REGISTER", { playerId });
       if (res.ok) {
@@ -37,9 +57,9 @@ export function SocketProvider({ children }: { children: ReactNode }) {
     };
 
     const handleDisconnect = () => setIsRegistered(false);
-    const handleGameState = (state: GameState) => setGameState(state);
+    const handleGameState = (state: GameState) => applyGameState(state);
     const handleRoomCreated = ({ state }: { state: GameState }) =>
-      setGameState(state);
+      applyGameState(state);
 
     socket.on("connect", handleConnect);
     socket.on("disconnect", handleDisconnect);
@@ -66,6 +86,7 @@ export function SocketProvider({ children }: { children: ReactNode }) {
         errors,
         pushError,
         dismissError,
+        resetGameState,
       }}
     >
       {children}

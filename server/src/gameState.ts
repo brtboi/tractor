@@ -106,6 +106,27 @@ export function addPlayer(
   });
 }
 
+export function removePlayer(prev: GameState, playerId: string): GameState {
+  if (!prev.players[playerId]) throw new ServerError("PLAYER_NOT_FOUND");
+  // the round engine has no notion of a player disappearing mid-round, so
+  // leaving is only supported before the game starts
+  if (prev.phase !== "waiting_start")
+    throw new ServerError("GAME_ALREADY_STARTED");
+
+  return produce(prev, (draft) => {
+    draft.playerOrder = draft.playerOrder.filter((id) => id !== playerId);
+    delete draft.players[playerId];
+
+    // re-pair teams (seats 0&2 vs 1&3) from what's left of the seating order
+    draft.teams[0].playerIds = [draft.playerOrder[0], draft.playerOrder[2]].filter(
+      (id): id is string => !!id,
+    );
+    draft.teams[1].playerIds = [draft.playerOrder[1], draft.playerOrder[3]].filter(
+      (id): id is string => !!id,
+    );
+  });
+}
+
 export function renamePlayer(
   prev: GameState,
   playerId: string,
