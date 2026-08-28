@@ -2,20 +2,11 @@ import { useState } from "react";
 import { clsx } from "clsx";
 import type { AckResult, Card } from "@tractor/shared";
 import { useGameSocket } from "../services/useGameSocket";
+import { useRoomActions } from "../services/useRoomActions";
 import ActionBar, { type ActionDescriptor } from "./ActionBar";
 import CardHand from "./CardHand";
 import TableCenter from "./TableCenter";
 import styles from "./GamePage.module.scss";
-import {
-  drawCard,
-  callTrump,
-  reinforceTrump,
-  setBottom,
-  skipAsk,
-  overturnTrump,
-  playTrick,
-  finishBreaking,
-} from "../services/gameActions";
 import {
   getSeatOrientation,
   isCardSelected,
@@ -24,7 +15,8 @@ import {
 } from "./GamePageHelpers";
 
 export default function GameBoard() {
-  const { playerId, gameState, pushError } = useGameSocket();
+  const { playerId, gameState } = useGameSocket();
+  const roomActions = useRoomActions();
   const currentRound = gameState?.currentRound;
 
   const [selectedCards, setSelectedCards] = useState<Card[]>([]);
@@ -44,8 +36,7 @@ export default function GameBoard() {
     onSuccess?: () => void,
   ) {
     const res = await fn();
-    if (!res.ok) pushError(res.error);
-    else onSuccess?.();
+    if (res.ok) onSuccess?.();
   }
 
   function handleCardClick(card: Card) {
@@ -56,7 +47,6 @@ export default function GameBoard() {
     return <p>no game state :(</p>;
   }
 
-  const roomId = gameState.roomId;
   const isBottomingMe =
     currentRound.phase === "bottoming" &&
     currentRound.bottomPlayer === playerId;
@@ -85,7 +75,7 @@ export default function GameBoard() {
       actions.push({
         id: "finish-breaking",
         label: "Finish Breaking",
-        onClick: () => runAction(() => finishBreaking(roomId)),
+        onClick: () => runAction(roomActions.finishBreaking),
       });
     }
   } else if (currentRound.phase === "drawing") {
@@ -93,7 +83,7 @@ export default function GameBoard() {
       actions.push({
         id: "draw",
         label: "Draw Card",
-        onClick: () => runAction(() => drawCard(roomId)),
+        onClick: () => runAction(roomActions.drawCard),
       });
     }
     actions.push({
@@ -102,7 +92,7 @@ export default function GameBoard() {
       disabled: selectedCards.length === 0,
       onClick: () =>
         runAction(
-          () => callTrump(roomId, selectedCards),
+          () => roomActions.callTrump(selectedCards),
           () => setSelectedCards([]),
         ),
     });
@@ -113,7 +103,7 @@ export default function GameBoard() {
         disabled: selectedCards.length === 0,
         onClick: () =>
           runAction(
-            () => reinforceTrump(roomId, selectedCards),
+            () => roomActions.reinforceTrump(selectedCards),
             () => setSelectedCards([]),
           ),
       });
@@ -126,8 +116,7 @@ export default function GameBoard() {
       onClick: () =>
         runAction(
           () =>
-            setBottom(
-              roomId,
+            roomActions.setBottom(
               selectedCards,
               myHand.filter((c) => !isCardSelected(c, selectedCards)),
             ),
@@ -145,14 +134,14 @@ export default function GameBoard() {
       disabled: selectedCards.length === 0,
       onClick: () =>
         runAction(
-          () => overturnTrump(roomId, selectedCards),
+          () => roomActions.overturnTrump(selectedCards),
           () => setSelectedCards([]),
         ),
     });
     actions.push({
       id: "skip-ask",
       label: "Skip",
-      onClick: () => runAction(() => skipAsk(roomId)),
+      onClick: () => runAction(roomActions.skipAsk),
     });
   } else if (
     currentRound.phase === "playing" &&
@@ -164,7 +153,7 @@ export default function GameBoard() {
       disabled: selectedCards.length === 0,
       onClick: () =>
         runAction(
-          () => playTrick(roomId, selectedCards),
+          () => roomActions.playTrick(selectedCards),
           () => setSelectedCards([]),
         ),
     });
@@ -180,7 +169,7 @@ export default function GameBoard() {
         round={currentRound}
         playerId={playerId}
         canDraw={canDraw}
-        onDrawPile={() => runAction(() => drawCard(roomId))}
+        onDrawPile={() => runAction(roomActions.drawCard)}
       />
 
       {gameState.playerOrder

@@ -1,24 +1,13 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import type { GameSettings } from "@tractor/shared";
 import { useGameSocket } from "../services/useGameSocket";
+import { useRoomActions } from "../services/useRoomActions";
 import SettingsModal from "./SettingsModal";
 import GameBoard from "./GameBoard";
 import styles from "./GamePage.module.scss";
-import {
-  addGhostPlayer,
-  leaveRoom,
-  pauseGame,
-  renamePlayer,
-  reorderPlayers,
-  resumeGame,
-  startTestGame,
-  updateSettings,
-} from "../services/gameActions";
 
 export default function GamePage() {
-  const { playerId, gameState, pushError, resetGameState } = useGameSocket();
-  const navigate = useNavigate();
+  const { playerId, gameState } = useGameSocket();
+  const actions = useRoomActions();
   const [isSettingsModalOpen, setIsSettingsModalOpen] =
     useState<boolean>(false);
 
@@ -26,52 +15,9 @@ export default function GamePage() {
     return <p>no game state :(</p>;
   }
 
-  const changeName = async (newName: string) => {
-    const res = await renamePlayer(gameState.roomId, newName);
-    if (!res.ok) pushError(res.error);
-  };
-
-  const handleAddGhostPlayer = async () => {
-    const res = await addGhostPlayer(gameState.roomId);
-    if (!res.ok) pushError(res.error);
-  };
-
-  const handleLeaveRoom = async () => {
-    // leaving needs to work even if the server can't confirm it (stale
-    // room, dropped connection) - clear local state regardless of the ack
-    const res = await leaveRoom(gameState.roomId);
-    if (!res.ok) pushError(res.error);
-    resetGameState();
-    navigate("/");
-  };
-
-  const handleUpdateSettings = async (settings: Partial<GameSettings>) => {
-    const res = await updateSettings(gameState.roomId, settings);
-    if (!res.ok) pushError(res.error);
-  };
-
-  const handleReorderPlayers = async (newPlayerOrder: string[]) => {
-    const res = await reorderPlayers(gameState.roomId, newPlayerOrder);
-    if (!res.ok) pushError(res.error);
-  };
-
-  const handlePauseGame = async () => {
-    const res = await pauseGame(gameState.roomId);
-    if (!res.ok) pushError(res.error);
-  };
-
-  const handleResumeGame = async () => {
-    const res = await resumeGame(gameState.roomId);
-    if (!res.ok) pushError(res.error);
-  };
-
   const handleStartTestGame = async () => {
-    const res = await startTestGame(gameState.roomId);
-    if (res.ok) {
-      setIsSettingsModalOpen(false);
-    } else {
-      pushError(res.error);
-    }
+    const res = await actions.startTestGame();
+    if (res.ok) setIsSettingsModalOpen(false);
   };
 
   const isModalShowing =
@@ -97,14 +43,14 @@ export default function GamePage() {
           setIsSettingsOpen={setIsSettingsModalOpen}
           state={gameState}
           playerId={playerId}
-          changeName={changeName}
-          addGhostPlayer={handleAddGhostPlayer}
+          changeName={actions.changeName}
+          addGhostPlayer={actions.addGhostPlayer}
           startGame={handleStartTestGame}
-          leaveRoom={handleLeaveRoom}
-          updateSettings={handleUpdateSettings}
-          reorderPlayers={handleReorderPlayers}
-          pauseGame={handlePauseGame}
-          resumeGame={handleResumeGame}
+          leaveRoom={actions.leaveRoom}
+          updateSettings={actions.updateSettings}
+          reorderPlayers={actions.reorderPlayers}
+          pauseGame={actions.pauseGame}
+          resumeGame={actions.resumeGame}
         />
       )}
     </>
