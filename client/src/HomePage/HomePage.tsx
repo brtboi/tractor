@@ -53,13 +53,7 @@ export default function HomePage() {
             <button type="submit">E</button>
           </form>
         </div>
-        <button
-          onClick={() => {
-            pushError("error test");
-          }}
-        >
-          test toast
-        </button>
+  
       </div>
     </div>
   );
