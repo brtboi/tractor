@@ -36,7 +36,11 @@ export function isTrickInList(trick: Card[], list: Card[]): boolean {
   });
 }
 
-function isTrump(card: Card, trumpSuit: Suit, trumpRank: number): boolean {
+export function isTrump(
+  card: Card,
+  trumpSuit: Suit,
+  trumpRank: number,
+): boolean {
   return (
     card.suit === trumpSuit || card.suit === "Joker" || card.rank === trumpRank
   );
@@ -49,7 +53,7 @@ export function getPointValue(card: Card | Card[]): number {
 
   if (card.rank === 5) return 5;
   if (card.rank === 10) return 10;
-  if (card.rank === 13) return 0;
+  if (card.rank === 13) return 10;
   return 0;
 }
 
@@ -369,4 +373,76 @@ export function compareTricks(
   }
 
   return 1; // a wins
+}
+
+/**
+ * the suit a card plays as: "Joker" for any trump, otherwise its printed suit
+ */
+export function getEffectiveSuit(
+  card: Card,
+  trumpSuit: Suit,
+  trumpRank: number,
+): Suit {
+  return isTrump(card, trumpSuit, trumpRank) ? "Joker" : card.suit;
+}
+
+/**
+ * number of pairs (two identical cards from different decks) in `cards`
+ */
+export function countPairs(cards: Card[]): number {
+  const counts = new Map<string, number>();
+  for (const card of cards) {
+    const key = `${card.suit}-${card.rank}`;
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+  let pairs = 0;
+  for (const count of counts.values()) pairs += Math.floor(count / 2);
+  return pairs;
+}
+
+/**
+ * Checks whether `trick` is a legal play from `hand`. Returns a short
+ * human-readable reason if not, or null if the play is fine.
+ * - leading: any non-empty set of cards that all share one (effective) suit
+ * - following: same number of cards as the lead, as many of the lead suit
+ *   as you have, and as many pairs of the lead suit as you can match
+ *
+ * TODO: tractors aren't enforced when following, and throws aren't checked
+ * against other hands
+ */
+export function getPlayError(
+  trick: Card[],
+  hand: Card[],
+  leadTrick: Card[] | null,
+  trumpSuit: Suit,
+  trumpRank: number,
+): string | null {
+  if (trick.length === 0) return "select some cards";
+  if (!isTrickInList(trick, hand)) return "cards not found in hand";
+
+  const suitOf = (card: Card) => getEffectiveSuit(card, trumpSuit, trumpRank);
+
+  if (!leadTrick) {
+    const suit = suitOf(trick[0]);
+    if (trick.some((card) => suitOf(card) !== suit))
+      return "a lead must all be one suit";
+    return null;
+  }
+
+  if (trick.length !== leadTrick.length)
+    return `play ${leadTrick.length} card${leadTrick.length === 1 ? "" : "s"}`;
+
+  const leadSuit = suitOf(leadTrick[0]);
+  const suitName = leadSuit === "Joker" ? "trump" : leadSuit.toLowerCase();
+  const handInSuit = hand.filter((card) => suitOf(card) === leadSuit);
+  const playedInSuit = trick.filter((card) => suitOf(card) === leadSuit);
+
+  if (playedInSuit.length < Math.min(handInSuit.length, leadTrick.length))
+    return `follow ${suitName}`;
+
+  const pairsNeeded = Math.min(countPairs(leadTrick), countPairs(handInSuit));
+  if (countPairs(playedInSuit) < pairsNeeded)
+    return `play your ${suitName} pair${pairsNeeded === 1 ? "" : "s"}`;
+
+  return null;
 }

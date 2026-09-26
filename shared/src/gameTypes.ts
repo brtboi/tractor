@@ -30,6 +30,8 @@ export type Player = {
   // false while this seat is vacant (its original occupant left mid-game
   // and hasn't been replaced yet) - still holds their seat/team/hand
   active: boolean;
+  // server-driven stand-in seat (added by the host for testing)
+  isGhost: boolean;
 };
 
 export type TrickSequence = {
@@ -59,6 +61,10 @@ export type RoundState = {
 
   currentTurn: string; // playerId
   currentTricks: { playerId: string; trick: Card[] }[];
+  // the most recently completed trick, kept so clients can show it after
+  // currentTricks is cleared
+  lastTrick: { playerId: string; trick: Card[] }[];
+  lastTrickWinner: string | null;
 
   drawPile: Card[];
   hands: Record<string, Card[]>; // player ID -> hand
@@ -89,6 +95,17 @@ export type Team = {
   hasPlayed: PlayedScores;
 };
 
+export type RoundSummary = {
+  roundNumber: number; // 0 index
+  onTeam: number; // team that was on (defending) this round
+  points: number; // off team's final total, including the bottom
+  bottom: Card[];
+  bottomPoints: number; // points the off team got from the bottom (after multiplier)
+  levelingTeam: number; // team whose level moved (or who took over as on team)
+  fromLevel: number;
+  toLevel: number;
+};
+
 export type GamePhase = "waiting_start" | "waiting_next_round" | "playing" | "game_over";
 
 export type GameState = {
@@ -103,6 +120,7 @@ export type GameState = {
 
   currentRoundNumber: number; // 0 index
   currentRound: RoundState | null;
+  lastRoundSummary: RoundSummary | null;
 
   settings: GameSettings
 

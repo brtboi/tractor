@@ -32,7 +32,9 @@ import {
   setBottom,
   skipAsk,
   overturnTrump,
+  nextRound,
 } from "./gameState.js";
+import { getGhostMove } from "./ghostBot.js";
 
 const app = express();
 const httpServer = createServer(app);
@@ -71,12 +73,46 @@ function broadcastState(roomId: string) {
     if (!player.active) return;
     io.to(player.id).emit("GAME_STATE", stateForPlayer(state, player.id));
   });
+  scheduleGhostMove(roomId);
+}
+
+const ghostTimers: Record<string, ReturnType<typeof setTimeout>> = {};
+
+/**
+ * If a ghost player is up next, act for them after a short delay. The move
+ * is recomputed when the timer fires since a human may have acted meanwhile.
+ */
+function scheduleGhostMove(roomId: string) {
+  clearTimeout(ghostTimers[roomId]);
+  const state = rooms[roomId];
+  if (!state) return;
+
+  const move = getGhostMove(state);
+  if (!move) return;
+
+  ghostTimers[roomId] = setTimeout(() => {
+    const current = rooms[roomId];
+    if (!current) return;
+    const nextMove = getGhostMove(current);
+    if (!nextMove) return;
+    try {
+      rooms[roomId] = nextMove.apply(current);
+      broadcastState(roomId);
+    } catch (e: unknown) {
+      console.error(`ghost move failed in room ${roomId}:`, e);
+    }
+  }, move.delayMs);
+}
+
+function defaultName(state: GameState): string {
+  return `Player ${state.playerOrder.length + 1}`;
 }
 
 function toAckResult(e: unknown): AckResult {
   if (e instanceof ServerError) {
     return { ok: false, error: e.message, code: e.code };
   }
+  console.error(e);
   return { ok: false, error: "Unknown error", code: "UNKNOWN_ERROR" };
 }
 
@@ -101,7 +137,11 @@ io.on("connection", (socket) => {
       const playerId = getPlayerId(socket);
       const roomId = Math.random().toString(36).slice(2, 7).toUpperCase();
       rooms[roomId] = createRoom(roomId);
-      rooms[roomId] = addPlayer(rooms[roomId], playerId, name || playerId);
+      rooms[roomId] = addPlayer(
+        rooms[roomId],
+        playerId,
+        name || defaultName(rooms[roomId]),
+      );
       playerToRoom[playerId] = roomId;
 
       socket.join(roomId);
@@ -119,7 +159,11 @@ io.on("connection", (socket) => {
       const playerId = getPlayerId(socket);
       if (!rooms[roomId]) throw new ServerError("ROOM_NOT_FOUND");
       if (!rooms[roomId].players[playerId]?.active) {
-        rooms[roomId] = addPlayer(rooms[roomId], playerId, name || playerId);
+        rooms[roomId] = addPlayer(
+          rooms[roomId],
+          playerId,
+          name || defaultName(rooms[roomId]),
+        );
       }
 
       playerToRoom[playerId] = roomId;
@@ -137,10 +181,14 @@ io.on("connection", (socket) => {
       const playerId = getPlayerId(socket);
       if (!rooms[roomId]) throw new ServerError("ROOM_NOT_FOUND");
       requireHost(rooms[roomId], playerId);
+      const ghostCount = Object.values(rooms[roomId].players).filter(
+        (p) => p.isGhost,
+      ).length;
       rooms[roomId] = addPlayer(
         rooms[roomId],
         Math.random().toString(36).slice(2, 7).toUpperCase(),
-        "Ghost Player",
+        `Ghost ${ghostCount + 1}`,
+        true,
       );
       broadcastState(roomId);
 
@@ -172,7 +220,7 @@ io.on("connection", (socket) => {
       rooms[roomId] = renamePlayer(
         rooms[roomId],
         playerId,
-        newName || playerId,
+        newName.trim() || rooms[roomId].players[playerId]?.name || playerId,
       );
       broadcastState(roomId);
 
@@ -264,6 +312,18 @@ io.on("connection", (socket) => {
       const playerId = getPlayerId(socket);
       if (!rooms[roomId]) throw new ServerError("ROOM_NOT_FOUND");
       rooms[roomId] = startTestGame(rooms[roomId], playerId);
+      broadcastState(roomId);
+      ack({ ok: true });
+    } catch (e: unknown) {
+      ack(toAckResult(e));
+    }
+  });
+
+  socket.on("NEXT_ROUND", async ({ roomId }, ack) => {
+    try {
+      const playerId = getPlayerId(socket);
+      if (!rooms[roomId]) throw new ServerError("ROOM_NOT_FOUND");
+      rooms[roomId] = nextRound(rooms[roomId], playerId);
       broadcastState(roomId);
       ack({ ok: true });
     } catch (e: unknown) {
@@ -370,6 +430,7 @@ io.on("connection", (socket) => {
   socket.on("PLAY_TRICK", async ({ roomId, trick }, ack) => {
     try {
       const playerId = getPlayerId(socket);
+      if (!rooms[roomId]) throw new ServerError("ROOM_NOT_FOUND");
       rooms[roomId] = playTrick(rooms[roomId], playerId, trick);
       broadcastState(roomId);
       ack({ ok: true });

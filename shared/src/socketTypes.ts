@@ -58,6 +58,10 @@ export type ClientToServerEvents = {
     payload: { roomId: string },
     ack: (res: AckResult) => void,
   ) => void;
+  NEXT_ROUND: (
+    payload: { roomId: string },
+    ack: (res: AckResult) => void,
+  ) => void;
   BREAK_DECK: (
     payload: { roomId: string; breakAt: number },
     ack: (res: AckResult) => void,

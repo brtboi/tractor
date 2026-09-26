@@ -13,6 +13,7 @@ import {
   getPointValue,
   getCallLevel,
   isCardSame,
+  getPlayError,
   Team,
 } from "@tractor/shared";
 
@@ -28,6 +29,11 @@ function requireRound(
 ): RoundState {
   const round = state.currentRound;
   if (!round) throw new ServerError("NO_ACTIVE_ROUND");
+  if (state.phase !== "playing")
+    throw new ServerError(
+      "GAME_NOT_IN_PROGRESS",
+      `expected game phase playing, found ${state.phase}`,
+    );
   if (state.paused) throw new ServerError("GAME_PAUSED");
 
   if (expectedPhase) {
@@ -87,19 +93,20 @@ export function createRoom(roomId: string): GameState {
     paused: false,
     teams: [
       {
-        name: "team 0",
+        name: "Team 1",
         playerIds: [],
         score: 2,
         hasPlayed: new Array(15).fill(0),
       },
       {
-        name: "team 1",
+        name: "Team 2",
         playerIds: [],
         score: 2,
         hasPlayed: new Array(15).fill(0),
       },
     ],
     currentRound: null,
+    lastRoundSummary: null,
     settings: {
       mustPlay: new Array(15).fill(0),
       maxScoreJump: 4,
@@ -132,7 +139,12 @@ function replaceSeat(
   const idx = draft.playerOrder.indexOf(oldId);
   draft.playerOrder[idx] = newId;
   delete draft.players[oldId];
-  draft.players[newId] = { id: newId, name: newName, active: true };
+  draft.players[newId] = {
+    id: newId,
+    name: newName,
+    active: true,
+    isGhost: false,
+  };
 
   for (const team of draft.teams) {
     const teamIdx = team.playerIds.indexOf(oldId);
@@ -161,6 +173,7 @@ export function addPlayer(
   prev: GameState,
   playerId: string,
   playerName: string,
+  isGhost: boolean = false,
 ): GameState {
   if (prev.phase !== "waiting_start") {
     // game already started: the only way in is taking over a vacant seat
@@ -181,7 +194,12 @@ export function addPlayer(
   return produce(prev, (draft) => {
     if (draft.playerOrder.length === 0) draft.hostId = playerId;
     draft.playerOrder.push(playerId);
-    draft.players[playerId] = { id: playerId, name: playerName, active: true };
+    draft.players[playerId] = {
+      id: playerId,
+      name: playerName,
+      active: true,
+      isGhost,
+    };
   });
 }
 
@@ -357,6 +375,8 @@ function newRound(
     trumpRank: trumpRank,
     currentTurn: onPlayer,
     currentTricks: [],
+    lastTrick: [],
+    lastTrickWinner: null,
 
     drawPile: shuffleCards(2),
     hands: playerOrder.reduce((acc, id) => ({ ...acc, [id]: [] }), {}),
@@ -432,21 +452,24 @@ export function breakDeck(
       "NOT_YOUR_TURN",
       `expected playerId ${breakerId}, found ${playerId}`,
     );
-  if (!Number.isInteger(breakAt) || breakAt < 0 || breakAt > 2 * 54)
+  if (
+    !Number.isInteger(breakAt) ||
+    breakAt < 1 ||
+    breakAt >= round.drawPile.length
+  )
     throw new ServerError(
       "INVALID_BREAK",
       `break index out of bounds: ${breakAt}`,
     );
 
+  // cut the deck: the top `breakAt` cards go to the bottom
   return produce(prev, (draft) => {
-    const drawPile = draft.currentRound!.drawPile;
-    if (breakAt === 2 * 54)
-      round.drawPile = [drawPile[breakAt], ...drawPile.slice(0, breakAt - 1)];
-    else
-      round.drawPile = [
-        ...drawPile.slice(breakAt + 1),
-        ...drawPile.slice(0, breakAt),
-      ];
+    const draftRound = draft.currentRound!;
+    const drawPile = draftRound.drawPile;
+    draftRound.drawPile = [
+      ...drawPile.slice(breakAt),
+      ...drawPile.slice(0, breakAt),
+    ];
   });
 }
 
@@ -511,6 +534,7 @@ export function drawCard(prev: GameState, playerId: string): GameState {
       } else if (draft.currentRoundNumber === 0) {
         // set on/off team if first round based off of who called
         round.onTeam = getTeam(round.callPlayer, draft.teams);
+        round.onPlayer = round.callPlayer;
         round.bottomPlayer = round.callPlayer;
       }
     } else {
@@ -569,12 +593,18 @@ export function callTrump(
   if (!isTrickInList(cards, hand))
     throw new ServerError("INVALID_CALL", "cards not found in hand");
 
-  if (playerId === round.callPlayer) return prev;
+  if (playerId === round.callPlayer)
+    throw new ServerError(
+      "INVALID_CALL",
+      "you already called, reinforce instead",
+    );
+  if (getCallLevel(cards, round.trumpRank) === -1)
+    throw new ServerError("INVALID_CALL", "not a valid call");
   if (
     getCallLevel(cards, round.trumpRank) <=
     getCallLevel(round.callCards, round.trumpRank)
   )
-    return prev;
+    throw new ServerError("INVALID_CALL", "call must beat the current call");
 
   return produce(prev, (draft) => {
     const round = draft.currentRound!;
@@ -621,6 +651,11 @@ export function setBottom(
     // if trump was already locked in from the bottom (isFinalCall), nobody
     // can overturn anymore, so skip straight to playing instead of asking
     round.phase = round.isFinalCall ? "playing" : "asking";
+    // asking goes around starting after the bottom player; playing starts
+    // with whoever is on
+    round.currentTurn = round.isFinalCall
+      ? round.onPlayer
+      : getNextTurn(prev.playerOrder, playerId);
     round.bottom = newBottom;
     round.hands[playerId] = newHand;
   });
@@ -675,17 +710,26 @@ export function overturnTrump(
     draftRound.phase = "bottoming";
     draftRound.trumpSuit = cards[0].suit;
     draftRound.callCards = cards;
+    draftRound.callPlayer = playerId;
     draftRound.bottomPlayer = playerId;
     draftRound.currentTurn = playerId;
 
     // reset on/off team if first round and overturned
-    if (round.phase === "asking_before_bottoming" && draft.currentRoundNumber === 0) {
+    if (
+      round.phase === "asking_before_bottoming" &&
+      draft.currentRoundNumber === 0
+    ) {
       draftRound.onTeam = getTeam(playerId, draft.teams);
+      draftRound.onPlayer = playerId;
     }
   });
 }
 
-function getNextRound(draft: GameState, totalPoints: number) {
+function getNextRound(
+  draft: GameState,
+  totalPoints: number,
+  bottomPoints: number,
+) {
   const round = draft.currentRound!;
   let onTeam = round.onTeam;
 
@@ -711,23 +755,37 @@ function getNextRound(draft: GameState, totalPoints: number) {
       );
   }
 
-  // check if they can jump all the way to nextScore
-  for (; currentScore <= nextScore; currentScore++) {
-    if (currentScore === 15) {
-      draft.phase = "game_over";
-      draft.winner = onTeam;
-      return;
-    }
-
-    if (
-      draft.settings.mustPlay[currentScore] >
-      draft.teams[onTeam].hasPlayed[currentScore]
-    )
+  // climb one level at a time, stopping early at any level this team still
+  // has to play (settings.mustPlay); climbing past A (14) wins the game
+  let level = currentScore;
+  while (level < nextScore && level < 15) {
+    if (draft.settings.mustPlay[level] > draft.teams[onTeam].hasPlayed[level])
       break;
+    level++;
   }
 
-  draft.teams[onTeam].score = currentScore;
-  draft.teams[onTeam].hasPlayed[currentScore] = 1;
+  draft.lastRoundSummary = {
+    roundNumber: draft.currentRoundNumber,
+    onTeam: round.onTeam,
+    points: totalPoints,
+    bottom: round.bottom.map((card) => ({ ...card })),
+    bottomPoints,
+    levelingTeam: onTeam,
+    fromLevel: currentScore,
+    toLevel: level,
+  };
+
+  if (level === 15) {
+    draft.phase = "game_over";
+    draft.winner = onTeam;
+    return;
+  }
+
+  draft.teams[onTeam].score = level;
+  draft.teams[onTeam].hasPlayed[level] = Math.max(
+    draft.teams[onTeam].hasPlayed[level],
+    1,
+  ) as 1 | 2;
 
   draft.phase = "waiting_next_round";
   draft.currentRoundNumber += 1;
@@ -739,24 +797,41 @@ function getNextRound(draft: GameState, totalPoints: number) {
   );
 }
 
+/**
+ * Moves from the round summary screen into the next round. Host only.
+ */
+export function nextRound(prev: GameState, playerId: string): GameState {
+  requireHost(prev, playerId);
+  if (prev.phase !== "waiting_next_round")
+    throw new ServerError(
+      "INVALID_PHASE",
+      `expected game phase waiting_next_round, found ${prev.phase}`,
+    );
+
+  return produce(prev, (draft) => {
+    draft.phase = "playing";
+  });
+}
+
 export function playTrick(
   prev: GameState,
   playerId: string,
   trick: Card[],
 ): GameState {
-  if (prev.phase !== "playing")
-    throw new ServerError(
-      "GAME_NOT_IN_PROGRESS",
-      `Expected phase to be 'playing', found '${prev.phase}'`,
-    );
-
-  const prevRound = requireRound(prev);
+  const prevRound = requireRound(prev, "playing");
   requireTurn(prevRound, playerId);
 
   if (!prevRound.trumpSuit)
     throw new ServerError("INVALID_TRICK", "Trump not set");
-  if (!isTrickInList(trick, prevRound.hands[playerId]))
-    throw new ServerError("INVALID_TRICK", "cards not found in hand");
+
+  const playError = getPlayError(
+    trick,
+    prevRound.hands[playerId],
+    prevRound.currentTricks[0]?.trick ?? null,
+    prevRound.trumpSuit,
+    prevRound.trumpRank,
+  );
+  if (playError) throw new ServerError("INVALID_TRICK", playError);
 
   return produce(prev, (draft) => {
     const round = draft.currentRound!;
@@ -773,25 +848,27 @@ export function playTrick(
       for (let i = 1; i < round.currentTricks.length; i++) {
         if (
           compareTricks(
-            round.currentTricks[i].trick,
             round.currentTricks[winnerIndex].trick,
+            round.currentTricks[i].trick,
             round.currentTricks[0].trick,
             round.trumpSuit!,
             round.trumpRank,
-          ) > 0
+          ) < 0
         )
           winnerIndex = i;
       }
 
-      // winner plays first next trick
-      round.currentTurn = round.currentTricks[winnerIndex].playerId;
+      const winnerId = round.currentTricks[winnerIndex].playerId;
 
-      const winningTeam = getTeam(playerId, draft.teams);
+      // winner plays first next trick
+      round.currentTurn = winnerId;
+
+      const winningTeam = getTeam(winnerId, draft.teams);
 
       if (winningTeam === -1)
         throw new ServerError(
           "PLAYER_NOT_FOUND",
-          `cannot find player ${playerId} in teams. Team 0: ${draft.teams[0].playerIds}. Team 1: ${draft.teams[1].playerIds}`,
+          `cannot find player ${winnerId} in teams. Team 0: ${draft.teams[0].playerIds}. Team 1: ${draft.teams[1].playerIds}`,
         );
 
       for (const {
@@ -816,19 +893,24 @@ export function playTrick(
         }
       }
 
+      round.lastTrick = round.currentTricks.map(({ playerId, trick }) => ({
+        playerId,
+        trick: trick.map((card) => ({ ...card })),
+      }));
+      round.lastTrickWinner = winnerId;
       round.currentTricks = [];
 
       // out of cards: end round
       if (round.hands[round.currentTurn].length === 0) {
-        draft.phase = "waiting_next_round";
-
         let totalPoints = getPointValue(round.points);
 
-        // get points from bottom
+        // off team winning the last trick also wins the bottom's points
+        let bottomPoints = 0;
         if (winningTeam !== round.onTeam)
-          totalPoints += trick.length * 2 * getPointValue(round.bottom);
+          bottomPoints = trick.length * 2 * getPointValue(round.bottom);
+        totalPoints += bottomPoints;
 
-        getNextRound(draft, totalPoints);
+        getNextRound(draft, totalPoints, bottomPoints);
       }
     }
   });
@@ -852,6 +934,9 @@ export function stateForPlayer(state: GameState, playerId: string): GameState {
       if (id === playerId) continue;
       draftRound.hands[id] = draftRound.hands[id].map(() => HIDDEN_CARD);
     }
+
+    // draw pile: only its size is public
+    draftRound.drawPile = draftRound.drawPile.map(() => HIDDEN_CARD);
 
     // discards: your own full history is visible; for everyone else, only
     // the most recently discarded trick is visible (mirrors a real table,
