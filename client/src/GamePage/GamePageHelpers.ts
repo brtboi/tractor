@@ -1,4 +1,12 @@
-import { getCanonicalRank, isCardSame, type Card, type Suit } from "@tractor/shared";
+import {
+  getCallLevel,
+  getCanonicalRank,
+  isCardSame,
+  isTrickInList,
+  type Card,
+  type RoundState,
+  type Suit,
+} from "@tractor/shared";
 
 export type Orientation = "top" | "bottom" | "left" | "right";
 
@@ -39,6 +47,71 @@ export function toggleCard(card: Card, selected: Card[]): Card[] {
   return isCardSelected(card, selected)
     ? selected.filter((c) => !isCardSame(card, c))
     : [...selected, card];
+}
+
+/**
+ * The trump suit as far as the players know. Until someone calls, the
+ * round's trumpSuit is just a placeholder, so treat it as no-trump
+ * ("Joker") - that still groups jokers and trump-rank cards together.
+ */
+export function getKnownTrumpSuit(round: RoundState): Suit {
+  const isUncalled =
+    round.callPlayer === null &&
+    (round.phase === "breaking" || round.phase === "drawing");
+  return isUncalled ? "Joker" : (round.trumpSuit ?? "Joker");
+}
+
+/**
+ * Mirrors the server's callTrump checks. The server silently ignores a call
+ * that doesn't beat the current one, so check up front instead.
+ */
+export function canCallTrump(
+  cards: Card[],
+  round: RoundState,
+  playerId: string,
+): boolean {
+  if (round.phase !== "drawing" || round.callPlayer === playerId) return false;
+  return (
+    getCallLevel(cards, round.trumpRank) >
+    getCallLevel(round.callCards, round.trumpRank)
+  );
+}
+
+/** Mirrors the server's reinforceTrump checks. */
+export function canReinforceTrump(
+  cards: Card[],
+  round: RoundState,
+  playerId: string,
+): boolean {
+  if (round.phase !== "drawing" || round.callPlayer !== playerId) return false;
+  return (
+    isTrickInList(round.callCards, cards) &&
+    cards.every(
+      (card) => card.rank === round.trumpRank && card.suit === round.trumpSuit,
+    ) &&
+    getCallLevel(cards, round.trumpRank) >
+      getCallLevel(round.callCards, round.trumpRank)
+  );
+}
+
+const SUIT_SYMBOLS: Record<Suit, string> = {
+  Spades: "♠",
+  Hearts: "♥",
+  Clubs: "♣",
+  Diamonds: "♦",
+  Joker: "🃏",
+};
+
+export function describeCall(cards: Card[]): string {
+  if (cards.length === 0) return "";
+  const card = cards[0];
+  const label =
+    card.suit === "Joker"
+      ? card.rank === 16
+        ? "Big Joker"
+        : "Small Joker"
+      : `${LEVEL_LABELS[card.rank] ?? card.rank}${SUIT_SYMBOLS[card.suit]}`;
+  return cards.length > 1 ? `${label} ×${cards.length}` : label;
 }
 
 /**

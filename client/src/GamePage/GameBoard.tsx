@@ -8,6 +8,9 @@ import CardHand from "./CardHand";
 import TableCenter from "./TableCenter";
 import styles from "./GamePage.module.scss";
 import {
+  canCallTrump,
+  canReinforceTrump,
+  getKnownTrumpSuit,
   getSeatOrientation,
   isCardSelected,
   sortHand,
@@ -56,7 +59,7 @@ export default function GameBoard() {
     ? [...rawHand, ...currentRound.bottom]
     : rawHand;
   const displayHand = sortEnabled
-    ? sortHand(myHand, currentRound.trumpSuit, currentRound.trumpRank)
+    ? sortHand(myHand, getKnownTrumpSuit(currentRound), currentRound.trumpRank)
     : myHand;
 
   const actions: ActionDescriptor[] = [];
@@ -86,24 +89,25 @@ export default function GameBoard() {
         onClick: () => runAction(roomActions.drawCard),
       });
     }
-    actions.push({
-      id: "call-trump",
-      label: "Call Trump",
-      disabled: selectedCards.length === 0,
-      onClick: () =>
-        runAction(
-          () => roomActions.callTrump(selectedCards),
-          () => setSelectedCards([]),
-        ),
-    });
     if (currentRound.callPlayer === playerId) {
       actions.push({
         id: "reinforce-trump",
         label: "Reinforce Trump",
-        disabled: selectedCards.length === 0,
+        disabled: !canReinforceTrump(selectedCards, currentRound, playerId),
         onClick: () =>
           runAction(
             () => roomActions.reinforceTrump(selectedCards),
+            () => setSelectedCards([]),
+          ),
+      });
+    } else {
+      actions.push({
+        id: "call-trump",
+        label: "Call Trump",
+        disabled: !canCallTrump(selectedCards, currentRound, playerId),
+        onClick: () =>
+          runAction(
+            () => roomActions.callTrump(selectedCards),
             () => setSelectedCards([]),
           ),
       });

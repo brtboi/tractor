@@ -22,6 +22,8 @@ type Props =
       cards: (Card | undefined)[];
     });
 
+// face-down cards arrive scrubbed (every one is the same HIDDEN_CARD), so
+// their identity can't be used as a key - fall back to position instead
 function cardKey(card: Card | undefined, index: number): string {
   return card ? `${card.deck}-${card.suit}-${card.rank}` : `back-${index}`;
 }
@@ -35,7 +37,7 @@ export default function CardHand(props: Props) {
         {cards.map((card, i) =>
           props.isFaceDown ? (
             <CardComponent
-              key={cardKey(card, i)}
+              key={cardKey(undefined, i)}
               isFaceDown={true}
               orientation={orientation}
               isSelected={false}

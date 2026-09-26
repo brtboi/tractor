@@ -2,7 +2,13 @@ import { motion, AnimatePresence } from "framer-motion";
 import { clsx } from "clsx";
 import type { GameState, RoundState } from "@tractor/shared";
 import CardComponent from "./CardComponent";
-import { getSeatOrientation, PHASE_LABELS } from "./GamePageHelpers";
+import {
+  describeCall,
+  getKnownTrumpSuit,
+  getSeatOrientation,
+  LEVEL_LABELS,
+  PHASE_LABELS,
+} from "./GamePageHelpers";
 import styles from "./GamePage.module.scss";
 
 type Props = {
@@ -29,6 +35,12 @@ export default function TableCenter({
     ? (gameState.players[round.callPlayer]?.name ?? round.callPlayer)
     : null;
 
+  const trumpRankLabel = LEVEL_LABELS[round.trumpRank] ?? round.trumpRank;
+  const knownTrumpSuit = getKnownTrumpSuit(round);
+  const isUncalled =
+    round.callPlayer === null &&
+    (round.phase === "breaking" || round.phase === "drawing");
+
   return (
     <div className={styles.tableCenter}>
       <div className={styles.statusPills}>
@@ -38,14 +50,18 @@ export default function TableCenter({
         <span className={clsx(styles.pill, styles.turnPill)}>
           {turnLabel}
         </span>
-        {round.trumpSuit && (
-          <span className={styles.pill}>
-            Trump: {round.trumpRank}
-            {round.trumpSuit !== "Joker" ? ` of ${round.trumpSuit}` : ""}
-          </span>
-        )}
+        <span className={styles.pill}>
+          Trump: {trumpRankLabel}
+          {isUncalled
+            ? " (not called yet)"
+            : knownTrumpSuit !== "Joker"
+              ? ` of ${knownTrumpSuit}`
+              : " (no trump)"}
+        </span>
         {callPlayerName && (
-          <span className={styles.pill}>called by {callPlayerName}</span>
+          <span className={styles.pill}>
+            called by {callPlayerName}: {describeCall(round.callCards)}
+          </span>
         )}
       </div>
 

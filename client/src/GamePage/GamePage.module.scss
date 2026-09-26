@@ -25,14 +25,15 @@
   height: 100vh;
   overflow: hidden;
 
-  $padding: 6rem;
-
   .actionBar {
     position: absolute;
-    bottom: $padding;
+    bottom: 1rem;
     left: 50%;
-    transform: translate(-50%, 50%);
+    transform: translateX(-50%);
     z-index: 5;
+    // left: 50% would otherwise cap the shrink-to-fit width at half the
+    // screen and squash the hand
+    width: max-content;
 
     display: flex;
     flex-direction: column;
@@ -89,64 +90,48 @@
     }
   }
 
+  // hands lay out as a single overlapping row; positioning/rotation is left
+  // to the parent (.actionBar or .opponentSeat)
   .cardHand {
-    position: absolute;
-
-    --rotate: 0deg;
-    --translate: translate(0, 0);
-    transform: var(--translate) rotate(var(--rotate));
-
     display: flex;
     flex-direction: row;
 
-    &.bottom {
-      position: static;
+    > * {
+      // never let flexbox squeeze cards on top of each other
+      flex-shrink: 0;
     }
 
-    &.left {
-      top: 50%;
-      left: $padding;
-      --translate: translate(-50%, -50%);
-      --rotate: 90deg;
-    }
-
-    &.top {
-      top: $padding;
-      left: 50%;
-      --translate: translate(-50%, -50%);
-      --rotate: 180deg;
-    }
-
-    &.right {
-      top: 50%;
-      right: $padding;
-      --translate: translate(50%, -50%);
-      --rotate: 270deg;
-    }
-
-    :not(:first-child) {
+    > :not(:first-child) {
       margin-left: -48px;
     }
   }
 
   .opponentSeat {
     position: absolute;
+    width: max-content;
 
+    // opponents' hands are face down, so they can overlap more tightly
+    .cardHand > :not(:first-child) {
+      margin-left: -64px;
+    }
+
+    // left/right seats rotate around their center, so their offset from the
+    // edge is roughly half the seat's (label + card) height
     &.left {
       top: 50%;
-      left: calc($padding - 2.5rem);
+      left: 5rem;
       transform: translate(-50%, -50%) rotate(90deg);
     }
 
     &.top {
-      top: calc($padding - 2.5rem);
+      top: 1rem;
       left: 50%;
-      transform: translate(-50%, -50%);
+      transform: translateX(-50%);
     }
 
     &.right {
       top: 50%;
-      right: calc($padding - 2.5rem);
+      right: 5rem;
       transform: translate(50%, -50%) rotate(-90deg);
     }
 
