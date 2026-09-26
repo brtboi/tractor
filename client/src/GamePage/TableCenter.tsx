@@ -1,13 +1,23 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { clsx } from "clsx";
-import type { GameState, RoundState } from "@tractor/shared";
-import CardComponent from "./CardComponent";
 import {
+  getPointValue,
+  type AckResult,
+  type GameState,
+  type RoundState,
+} from "@tractor/shared";
+import CardComponent from "./CardComponent";
+import CutDeck from "./CutDeck";
+import {
+  cardKey,
   describeCall,
-  getKnownTrumpSuit,
+  describeTrump,
+  getBreakerId,
   getSeatOrientation,
-  LEVEL_LABELS,
-  PHASE_LABELS,
+  getTeamIndex,
+  playerName,
+  SEAT_VECTORS,
+  type Orientation,
 } from "./GamePageHelpers";
 import styles from "./GamePage.module.scss";
 
@@ -17,7 +27,46 @@ type Props = {
   playerId: string;
   canDraw: boolean;
   onDrawPile: () => void;
+  onCut: (breakAt: number) => Promise<AckResult>;
 };
+
+function getStatus(
+  gameState: GameState,
+  round: RoundState,
+  playerId: string,
+): string {
+  const turn = round.currentTurn;
+  const mine = turn === playerId;
+  const name = playerName(gameState, turn);
+
+  switch (round.phase) {
+    case "breaking": {
+      const breaker = getBreakerId(gameState.playerOrder, round.onPlayer);
+      return breaker === playerId
+        ? "Cut the deck"
+        : `${playerName(gameState, breaker)} is cutting the deck`;
+    }
+    // turns fly by while drawing, so keep this steady; the seat chips and
+    // the glowing pile show whose turn it is
+    case "drawing":
+      return "Drawing";
+    case "asking_before_bottoming":
+      return mine
+        ? "Nobody called — overturn or pass"
+        : `Final call · ${name} is deciding`;
+    case "bottoming":
+      return round.bottomPlayer === playerId
+        ? "Bury 8 cards"
+        : `${playerName(gameState, round.bottomPlayer)} is burying the bottom`;
+    case "asking":
+      return mine ? "Overturn trump or pass" : `${name} is deciding`;
+    case "playing":
+      if (!mine) return `${name}'s turn`;
+      return round.currentTricks.length === 0 ? "Your lead" : "Your turn";
+  }
+}
+
+const trickSpring = { type: "spring", stiffness: 320, damping: 32 } as const;
 
 export default function TableCenter({
   gameState,
@@ -25,141 +74,247 @@ export default function TableCenter({
   playerId,
   canDraw,
   onDrawPile,
+  onCut,
 }: Props) {
-  const turnLabel =
-    round.currentTurn === playerId
-      ? "your turn"
-      : `${gameState.players[round.currentTurn]?.name ?? round.currentTurn}'s turn`;
+  const status = getStatus(gameState, round, playerId);
+  const seatOf = (id: string): Orientation =>
+    getSeatOrientation(gameState.playerOrder, playerId, id);
 
-  const callPlayerName = round.callPlayer
-    ? (gameState.players[round.callPlayer]?.name ?? round.callPlayer)
-    : null;
+  // tricks: show the one in progress, or the last completed one (with its
+  // winner) until the next lead
+  const isShowingLast =
+    round.phase === "playing" &&
+    round.currentTricks.length === 0 &&
+    round.lastTrick.length > 0;
+  const plays = isShowingLast ? round.lastTrick : round.currentTricks;
+  const trickId =
+    plays.length > 0 && plays[0].trick.length > 0
+      ? `${plays[0].playerId}-${cardKey(plays[0].trick[0])}`
+      : "";
 
-  const trumpRankLabel = LEVEL_LABELS[round.trumpRank] ?? round.trumpRank;
-  const knownTrumpSuit = getKnownTrumpSuit(round);
-  const isUncalled =
-    round.callPlayer === null &&
-    (round.phase === "breaking" || round.phase === "drawing");
+  // a finished trick sweeps off toward whoever won it
+  const winnerVector = round.lastTrickWinner
+    ? SEAT_VECTORS[seatOf(round.lastTrickWinner)]
+    : { x: 0, y: 0 };
+
+  const lastTrickPoints = isShowingLast
+    ? getPointValue(round.lastTrick.flatMap((p) => p.trick))
+    : 0;
+  const offTeamWonLast =
+    !!round.lastTrickWinner &&
+    getTeamIndex(gameState, round.lastTrickWinner) !== round.onTeam;
+
+  const showBottomPile =
+    round.bottom.length > 0 &&
+    (round.phase === "asking_before_bottoming" ||
+      round.phase === "asking" ||
+      (round.phase === "bottoming" && round.bottomPlayer !== playerId));
 
   return (
     <div className={styles.tableCenter}>
-      <div className={styles.statusPills}>
-        <span className={styles.pill}>
-          {PHASE_LABELS[round.phase] ?? round.phase}
-        </span>
-        <span className={clsx(styles.pill, styles.turnPill)}>
-          {turnLabel}
-        </span>
-        <span className={styles.pill}>
-          Trump: {trumpRankLabel}
-          {isUncalled
-            ? " (not called yet)"
-            : knownTrumpSuit !== "Joker"
-              ? ` of ${knownTrumpSuit}`
-              : " (no trump)"}
-        </span>
-        {callPlayerName && (
-          <span className={styles.pill}>
-            called by {callPlayerName}: {describeCall(round.callCards)}
+      <div className={styles.statusLine}>
+        <AnimatePresence mode="wait" initial={false}>
+          <motion.div
+            key={status}
+            className={styles.statusText}
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -6 }}
+            transition={{ duration: 0.2 }}
+          >
+            {status}
+          </motion.div>
+        </AnimatePresence>
+        <div className={styles.statusChips}>
+          <span className={styles.chip}>
+            <span className={styles.muted}>trump</span>
+            {describeTrump(round)}
           </span>
-        )}
+          {round.callPlayer && round.callCards.length > 0 && (
+            <span className={styles.chip}>
+              <span className={styles.muted}>
+                {playerName(gameState, round.callPlayer)}
+              </span>
+              {describeCall(round.callCards)}
+            </span>
+          )}
+        </div>
       </div>
 
       <div className={styles.tableSurface}>
-        {round.drawPile.length > 0 && (
-          <motion.div
-            className={clsx(styles.drawPile, canDraw && styles.clickable)}
-            onClick={canDraw ? onDrawPile : undefined}
-            whileHover={canDraw ? { scale: 1.05 } : undefined}
-            whileTap={canDraw ? { scale: 0.95 } : undefined}
-          >
-            {Array.from({ length: Math.min(5, round.drawPile.length) }).map(
-              (_, i) => (
-                <div
-                  key={i}
-                  className={styles.drawPileCard}
-                  style={{ "--i": i } as React.CSSProperties}
-                >
-                  <img
-                    src="/cardSprites/back_red.png"
-                    alt="draw pile"
-                    draggable={false}
-                  />
-                </div>
-              ),
-            )}
-            <span className={styles.drawPileCount}>
-              {round.drawPile.length}
-            </span>
-          </motion.div>
-        )}
-
-        {round.bottom.length > 0 && round.phase !== "bottoming" && (
-          <div className={styles.bottomPile}>
-            {Array.from({ length: Math.min(4, round.bottom.length) }).map(
-              (_, i) => (
-                <div
-                  key={i}
-                  className={styles.bottomPileCard}
-                  style={{ "--i": i } as React.CSSProperties}
-                >
-                  <img
-                    src="/cardSprites/back_black.png"
-                    alt="bottom"
-                    draggable={false}
-                  />
-                </div>
-              ),
-            )}
-            <span className={styles.bottomPileCount}>
-              bottom &times; {round.bottom.length}
-            </span>
-          </div>
-        )}
-
         <AnimatePresence>
-          {round.currentTricks.map(({ playerId: trickPlayerId, trick }) => (
-            // outer plain div: static position/rotation per seat.
-            // framer-motion owns `transform` on any motion element it
-            // renders, so the enter/exit scale animation lives on the
-            // nested motion.div instead of fighting the CSS rotate here.
-            <div
-              key={trickPlayerId}
-              className={clsx(
-                styles.trickGroup,
-                styles[
-                  getSeatOrientation(
-                    gameState.playerOrder,
-                    playerId,
-                    trickPlayerId,
-                  )
-                ],
-              )}
+          {round.phase === "breaking" && (
+            <motion.div
+              key="cut"
+              className={styles.centered}
+              initial={{ opacity: 0, scale: 0.96 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.96 }}
+              transition={{ duration: 0.25 }}
+            >
+              <CutDeck
+                key={round.drawPile.length}
+                count={round.drawPile.length}
+                canCut={
+                  getBreakerId(gameState.playerOrder, round.onPlayer) ===
+                  playerId
+                }
+                onCut={onCut}
+              />
+            </motion.div>
+          )}
+
+          {round.phase === "drawing" && round.drawPile.length > 0 && (
+            <motion.div
+              key="draw"
+              className={styles.centered}
+              initial={{ opacity: 0, scale: 0.96 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              transition={{ duration: 0.25 }}
             >
               <motion.div
-                layout
-                initial={{ opacity: 0, scale: 0.4 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.4 }}
-                transition={{ type: "spring", stiffness: 420, damping: 30 }}
-                className={styles.trickCardsRow}
+                className={clsx(styles.pile, canDraw && styles.clickable)}
+                onClick={canDraw ? onDrawPile : undefined}
+                whileHover={canDraw ? { y: -3 } : undefined}
+                whileTap={canDraw ? { scale: 0.97 } : undefined}
               >
-                {trick.map((card) => (
+                {Array.from({
+                  length: Math.min(5, Math.ceil(round.drawPile.length / 20)),
+                }).map((_, i) => (
                   <div
-                    key={`${card.deck}-${card.suit}-${card.rank}`}
-                    className={styles.trickCard}
+                    key={i}
+                    className={styles.pileCard}
+                    style={{ "--i": i } as React.CSSProperties}
                   >
-                    <CardComponent
-                      card={card}
-                      isFaceDown={false}
-                      orientation="bottom"
-                      isSelected={false}
+                    <img
+                      src="/cardSprites/back_red.png"
+                      alt="draw pile"
+                      draggable={false}
                     />
                   </div>
                 ))}
+                {canDraw && <span className={styles.pileGlow} />}
               </motion.div>
-            </div>
-          ))}
+              <span className={styles.pileLabel}>
+                {round.drawPile.length} left
+              </span>
+            </motion.div>
+          )}
+
+          {showBottomPile && (
+            <motion.div
+              key="bottom"
+              className={clsx(styles.centered, styles.bottomArea)}
+              initial={{ opacity: 0, scale: 0.96 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              transition={{ duration: 0.25 }}
+            >
+              <div className={styles.pileColumn}>
+                <div className={clsx(styles.pile, styles.small)}>
+                  {Array.from({ length: 3 }).map((_, i) => (
+                    <div
+                      key={i}
+                      className={styles.pileCard}
+                      style={{ "--i": i } as React.CSSProperties}
+                    >
+                      <img
+                        src="/cardSprites/back_black.png"
+                        alt="bottom"
+                        draggable={false}
+                      />
+                    </div>
+                  ))}
+                </div>
+                <span className={styles.pileLabel}>bottom</span>
+              </div>
+              {round.isFinalCall && round.bottom[2] && (
+                <div className={styles.pileColumn}>
+                  <CardComponent
+                    card={round.bottom[2]}
+                    isFaceDown={false}
+                    orientation="bottom"
+                    isSelected={false}
+                    size="sm"
+                    shareLayout={false}
+                    animateEntry={false}
+                  />
+                  <span className={styles.pileLabel}>flipped for trump</span>
+                </div>
+              )}
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        <AnimatePresence custom={winnerVector}>
+          {plays.map(({ playerId: trickPlayerId, trick }) => {
+            const seat = seatOf(trickPlayerId);
+            const from = SEAT_VECTORS[seat];
+            const isWinner =
+              isShowingLast && trickPlayerId === round.lastTrickWinner;
+            return (
+              <motion.div
+                key={`${trickId}-${trickPlayerId}`}
+                custom={winnerVector}
+                className={clsx(
+                  styles.trickGroup,
+                  styles[seat],
+                  isWinner && styles.won,
+                )}
+                // your own cards glide in from your hand via layoutId,
+                // everyone else's slide in from their seat
+                initial={
+                  seat === "bottom"
+                    ? false
+                    : { opacity: 0, x: from.x * 70, y: from.y * 70 }
+                }
+                animate={{
+                  opacity: isShowingLast && !isWinner ? 0.5 : 1,
+                  x: 0,
+                  y: 0,
+                }}
+                variants={{
+                  exit: (to: { x: number; y: number }) => ({
+                    opacity: 0,
+                    x: to.x * 140,
+                    y: to.y * 140,
+                    scale: 0.85,
+                    transition: { duration: 0.35, ease: [0.4, 0, 1, 1] },
+                  }),
+                }}
+                exit="exit"
+                transition={trickSpring}
+              >
+                {trick.map((card) => (
+                  <CardComponent
+                    key={cardKey(card)}
+                    card={card}
+                    isFaceDown={false}
+                    orientation="bottom"
+                    isSelected={false}
+                    size="sm"
+                    animateEntry={false}
+                  />
+                ))}
+              </motion.div>
+            );
+          })}
+        </AnimatePresence>
+
+        <AnimatePresence>
+          {isShowingLast && offTeamWonLast && lastTrickPoints > 0 && (
+            <motion.span
+              key={`points-${trickId}`}
+              className={styles.trickPoints}
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.8 }}
+              transition={trickSpring}
+            >
+              +{lastTrickPoints}
+            </motion.span>
+          )}
         </AnimatePresence>
       </div>
     </div>

@@ -2,10 +2,20 @@
 // TODO: light mode support
 
 :root {
-  --bg-color: #1e1e1e;
-  --secondary-bg-color: #434343;
-  --text-color: #d0d0d0;
+  --bg-color: #151618;
+  --secondary-bg-color: #2a2d31;
+  --surface: rgba(255, 255, 255, 0.04);
+  --surface-hover: rgba(255, 255, 255, 0.08);
+  --surface-raised: #1c1e21;
+  --border: rgba(255, 255, 255, 0.08);
+  --border-strong: rgba(255, 255, 255, 0.18);
+  --text-color: #e6e6e6;
+  --text-muted: #8b9097;
+  --text-secondary: #8b9097;
   --primary-color: #3fc679;
+  --primary-soft: rgba(63, 198, 121, 0.12);
+  --primary-soft-hover: rgba(63, 198, 121, 0.2);
+  --primary-border: rgba(63, 198, 121, 0.35);
 
   --font-main: "Inter", system-ui, -apple-system, sans-serif;
 }
@@ -25,7 +35,7 @@ html, body, #root {
 
 body {
   font-family: var(--font-main);
-  font-size: 1.5rem;
+  font-size: 1rem;
   background-color: var(--bg-color);
   color: var(--text-color);
 

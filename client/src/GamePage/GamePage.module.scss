@@ -1,444 +1,981 @@
 @use "../_variables.scss" as *;
 
-// framer-motion drives transform (opacity/y/scale) on .cardComponent directly,
-// so layout-affecting styles live here but transform itself is left to JS.
+$card-md: calc(1.5 * 53px);
+$card-sm: 53px;
+
+// ---- shared bits ----
+
+.muted {
+  color: var(--text-muted);
+}
+
+.accentText {
+  color: var(--primary-color);
+}
+
+.eyebrow {
+  @include eyebrow;
+}
+
+.chip {
+  @include chip;
+}
+
+.primaryButton {
+  @include button-primary;
+}
+
+.secondaryButton {
+  @include button;
+}
+
+.quietButton {
+  @include button;
+  border-color: transparent;
+  background: transparent;
+  color: var(--text-muted);
+
+  &:hover:not(:disabled) {
+    color: var(--text-color);
+  }
+}
+
+.iconButton {
+  display: grid;
+  place-items: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 50%;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  transition:
+    background 150ms ease,
+    color 150ms ease;
+
+  &:hover:not(:disabled) {
+    background: var(--surface-hover);
+    color: var(--text-color);
+  }
+
+  &:disabled {
+    opacity: 0.3;
+    cursor: default;
+  }
+}
+
+// ---- cards ----
+
+// framer-motion drives transform on .cardComponent directly, so hover lift
+// and highlights live on the inner image instead
 .cardComponent {
+  position: relative;
+  flex-shrink: 0;
   cursor: default;
+
+  .cardImage {
+    display: block;
+    max-width: none;
+    image-rendering: pixelated;
+    transition:
+      transform 180ms $ease-out,
+      filter 180ms ease;
+  }
+
+  &.md .cardImage {
+    width: $card-md;
+  }
+
+  &.sm .cardImage {
+    width: $card-sm;
+  }
 
   &.selectable {
     cursor: pointer;
+
+    &:hover .cardImage {
+      transform: translateY(-6px);
+    }
   }
 
-  &.selected {
-    filter: drop-shadow(0 0 6px var(--primary-color));
+  &.selected .cardImage {
+    filter: drop-shadow(0 0 3px rgba(63, 198, 121, 0.9))
+      drop-shadow(0 6px 10px rgba(0, 0, 0, 0.35));
   }
 
-  .cardImage {
-    width: calc(1.5 * 53px);
-    image-rendering: pixelated;
+  // cards that just came up from the bottom while burying
+  &.highlighted::after {
+    content: "";
+    position: absolute;
+    top: -9px;
+    left: 11px;
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--primary-color);
+    box-shadow: 0 0 6px var(--primary-color);
   }
 }
 
-.gameBoard {
-  position: relative;
-  width: 100vw;
-  height: 100vh;
-  overflow: hidden;
+// hands are a single overlapping row; parents handle placement/rotation
+.cardHand {
+  display: flex;
+  flex-direction: row;
 
-  .actionBar {
+  &.md > :not(:first-child) {
+    margin-left: var(--overlap, -48px);
+    transition: margin-left 250ms $ease-out;
+  }
+
+  // face-down opponent hands; must match OPPONENT_OVERLAP in OpponentSeat
+  &.sm > :not(:first-child) {
+    margin-left: -42px;
+  }
+}
+
+// ---- board ----
+
+.gameBoard {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  background:
+    radial-gradient(
+      ellipse 55% 45% at 50% 48%,
+      rgba(63, 198, 121, 0.05),
+      transparent 70%
+    ),
+    var(--bg-color);
+}
+
+.settingsGearButton {
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  z-index: 6;
+
+  display: grid;
+  place-items: center;
+  width: 2.1rem;
+  height: 2.1rem;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--text-muted);
+  transition:
+    color 150ms ease,
+    border-color 150ms ease,
+    transform 300ms $ease-out;
+
+  &:hover {
+    color: var(--text-color);
+    border-color: var(--border-strong);
+    transform: rotate(45deg);
+  }
+}
+
+// ---- scoreboard ----
+
+.scoreboard {
+  position: absolute;
+  top: 1rem;
+  left: 1rem;
+  z-index: 3;
+  width: 13.5rem;
+  padding: 0.85rem 1rem;
+
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.025);
+  backdrop-filter: blur(8px);
+
+  .teamRow {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    gap: 0.6rem;
+  }
+
+  .teamDot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--border-strong);
+    transition: background 300ms ease;
+
+    &.on {
+      background: var(--primary-color);
+    }
+  }
+
+  .teamInfo {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  .teamName {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    font-size: 0.8rem;
+    font-weight: 500;
+  }
+
+  .onTag {
+    padding: 0 0.35rem;
+    border-radius: 999px;
+    background: var(--primary-soft);
+    color: var(--primary-color);
+    font-size: 0.62rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  .teamMembers {
+    overflow: hidden;
+    color: var(--text-muted);
+    font-size: 0.7rem;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
+  .teamLevel {
+    font-size: 1.05rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .pointsRow {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: baseline;
+    row-gap: 0.45rem;
+    overflow: hidden;
+    font-size: 0.75rem;
+  }
+
+  .pointsValue {
+    font-size: 0.95rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+// points bar, 0-160 with the 80 threshold marked in the middle
+.pointsTrack {
+  grid-column: 1 / -1;
+  position: relative;
+  height: 4px;
+  margin-bottom: 3px;
+  border-radius: 999px;
+  background: var(--surface-hover);
+
+  .pointsFill {
+    height: 100%;
+    border-radius: inherit;
+    background: var(--primary-color);
+  }
+
+  .pointsThreshold {
     position: absolute;
-    bottom: 1rem;
+    top: -3px;
+    bottom: -3px;
+    left: 50%;
+    width: 1px;
+    background: var(--text-muted);
+  }
+}
+
+// ---- opponents ----
+
+.opponentSeat {
+  position: absolute;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+
+  &.top {
+    top: 1rem;
     left: 50%;
     transform: translateX(-50%);
-    z-index: 5;
-    // left: 50% would otherwise cap the shrink-to-fit width at half the
-    // screen and squash the hand
-    width: max-content;
+    align-items: center;
+  }
 
+  &.left {
+    top: 50%;
+    left: 1.25rem;
+    transform: translateY(-50%);
+    align-items: flex-start;
+  }
+
+  &.right {
+    top: 50%;
+    right: 1.25rem;
+    transform: translateY(-50%);
+    align-items: flex-end;
+  }
+
+  .sideHand {
+    position: relative;
+  }
+
+  .sideHandInner {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) rotate(90deg);
+  }
+
+  &.right .sideHandInner {
+    transform: translate(-50%, -50%) rotate(-90deg);
+  }
+}
+
+.seatChip {
+  @include chip;
+  transition:
+    border-color 250ms ease,
+    background 250ms ease,
+    box-shadow 250ms ease;
+
+  .seatName {
+    font-weight: 500;
+  }
+
+  .seatCount {
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+  }
+
+  &.activeTurn {
+    border-color: var(--primary-border);
+    background: var(--primary-soft);
+    animation: turnPulse 2.4s ease-in-out infinite;
+  }
+}
+
+@keyframes turnPulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(63, 198, 121, 0);
+  }
+  50% {
+    box-shadow: 0 0 0 5px rgba(63, 198, 121, 0.08);
+  }
+}
+
+// ---- your seat ----
+
+.actionBar {
+  position: absolute;
+  bottom: 0.9rem;
+  left: 50%;
+  z-index: 5;
+  transform: translateX(-50%);
+  // left: 50% would otherwise cap the shrink-to-fit width at half the
+  // screen and squash the hand
+  width: max-content;
+
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.4rem;
+
+  .actionRow {
+    width: 100%;
+    min-width: 36rem;
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: end;
+    gap: 1rem;
+  }
+
+  .selfMeta {
+    justify-self: start;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding-bottom: 0.45rem;
+    font-size: 0.78rem;
+
+    .selfName {
+      font-weight: 500;
+    }
+  }
+
+  .turnDot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--border-strong);
+    transition:
+      background 250ms ease,
+      box-shadow 250ms ease;
+
+    &.active {
+      background: var(--primary-color);
+      box-shadow: 0 0 0 4px var(--primary-soft);
+    }
+  }
+
+  .actionCenter {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 0.5rem;
-
-    .cardHandOptions {
-      width: 100%;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-
-      .selectionCount {
-        color: var(--text-color);
-        opacity: 0.7;
-        font-size: 0.9rem;
-      }
-
-      .sortButton {
-        padding: 0.35rem 0.9rem;
-        border: 2px solid var(--secondary-bg-color);
-        border-radius: $border-radius-md;
-        background: var(--bg-color);
-        color: var(--text-color);
-
-        &.active {
-          border-color: var(--primary-color);
-          color: var(--primary-color);
-        }
-      }
-    }
-
-    .actionButtons {
-      display: flex;
-      flex-direction: row;
-      gap: 0.75rem;
-      min-height: 2.75rem;
-
-      .actionButton {
-        padding: 0.5rem 1.25rem;
-        border: 2px solid var(--primary-color);
-        border-radius: $border-radius-md;
-        background: var(--primary-color);
-        color: var(--bg-color);
-        font-weight: 600;
-
-        &:disabled {
-          cursor: not-allowed;
-          background: transparent;
-          color: var(--secondary-bg-color);
-          border-color: var(--secondary-bg-color);
-        }
-      }
-    }
+    gap: 0.45rem;
   }
 
-  // hands lay out as a single overlapping row; positioning/rotation is left
-  // to the parent (.actionBar or .opponentSeat)
-  .cardHand {
+  .hintSlot {
     display: flex;
-    flex-direction: row;
+    justify-content: center;
+    height: 1.1rem;
+  }
 
-    > * {
-      // never let flexbox squeeze cards on top of each other
-      flex-shrink: 0;
+  .hint {
+    color: var(--text-muted);
+    font-size: 0.74rem;
+    white-space: nowrap;
+  }
+
+  .actionButtons {
+    // AnimatePresence popLayout needs a positioned parent
+    position: relative;
+    display: flex;
+    gap: 0.5rem;
+    min-height: 2.1rem;
+  }
+
+  .actionButton {
+    @include button;
+
+    &:disabled {
+      opacity: unset;
     }
 
-    > :not(:first-child) {
-      margin-left: -48px;
+    &.primary {
+      @include primary-colors;
     }
   }
 
-  .opponentSeat {
-    position: absolute;
-    width: max-content;
+  .handToggles {
+    justify-self: end;
+    display: flex;
+    gap: 0.15rem;
+    padding-bottom: 0.3rem;
+  }
 
-    // opponents' hands are face down, so they can overlap more tightly
-    .cardHand > :not(:first-child) {
-      margin-left: -64px;
-    }
-
-    // left/right seats rotate around their center, so their offset from the
-    // edge is roughly half the seat's (label + card) height
-    &.left {
-      top: 50%;
-      left: 5rem;
-      transform: translate(-50%, -50%) rotate(90deg);
-    }
-
-    &.top {
-      top: 1rem;
-      left: 50%;
-      transform: translateX(-50%);
-    }
-
-    &.right {
-      top: 50%;
-      right: 5rem;
-      transform: translate(50%, -50%) rotate(-90deg);
-    }
-
-    .playerLabel {
-      display: block;
-      width: max-content;
-      margin: 0 auto 0.5rem;
-      padding: 0.25rem 0.75rem;
-      border-radius: $border-radius-md;
-      background: var(--secondary-bg-color);
-      color: var(--text-color);
-      font-size: 0.85rem;
-      text-align: center;
-
-      &.activeTurn {
-        background: var(--primary-color);
-        color: var(--bg-color);
-        font-weight: 600;
-        box-shadow: 0 0 12px var(--primary-color);
-      }
-    }
+  .toggle {
+    @include toggle;
   }
 }
 
-// ---- table center: status pills, draw pile, bottom pile, trick area ----
+// ---- table center ----
 
 .tableCenter {
   position: absolute;
   top: 50%;
   left: 50%;
-  transform: translate(-50%, -50%);
+  transform: translate(-50%, -58%);
 
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 1.5rem;
+  gap: 1.1rem;
 
-  .statusPills {
+  .statusLine {
     display: flex;
-    flex-direction: row;
-    gap: 0.5rem;
-    flex-wrap: wrap;
-    justify-content: center;
-
-    .pill {
-      padding: 0.3rem 0.85rem;
-      border-radius: 999px;
-      background: var(--secondary-bg-color);
-      color: var(--text-color);
-      font-size: 0.8rem;
-      white-space: nowrap;
-    }
-
-    .turnPill {
-      background: var(--primary-color);
-      color: var(--bg-color);
-      font-weight: 600;
-    }
+    flex-direction: column;
+    align-items: center;
+    gap: 0.55rem;
   }
 
-  .tableSurface {
-    position: relative;
-    width: 22rem;
-    height: 14rem;
+  .statusText {
+    font-size: 1rem;
+    font-weight: 500;
+    letter-spacing: -0.005em;
+  }
 
+  .statusChips {
     display: flex;
+    gap: 0.4rem;
+  }
+}
+
+.tableSurface {
+  position: relative;
+  width: 30rem;
+  height: 17rem;
+
+  .centered {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 3rem;
+    gap: 0.75rem;
   }
 
-  .drawPile,
-  .bottomPile {
-    position: relative;
-    width: calc(1.5 * 53px);
-    height: calc(1.5 * 53px * 1.4);
+  .bottomArea {
+    flex-direction: row;
+    gap: 2rem;
+  }
 
+  .pileColumn {
     display: flex;
-    align-items: flex-end;
-    justify-content: center;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.75rem;
+  }
+}
 
-    &.clickable {
-      cursor: pointer;
+.pile {
+  position: relative;
+  width: $card-md;
+  height: calc(1.5 * 75px);
+
+  &.small {
+    width: $card-sm;
+    height: 75px;
+
+    .pileCard img {
+      width: $card-sm;
     }
   }
 
-  .drawPileCard,
-  .bottomPileCard {
+  &.clickable {
+    cursor: pointer;
+  }
+
+  .pileCard {
     position: absolute;
     top: calc(var(--i) * -2px);
-    left: calc(var(--i) * 2px);
+    left: calc(var(--i) * 1.5px);
 
     img {
-      width: calc(1.5 * 53px);
+      width: $card-md;
+      max-width: none;
       image-rendering: pixelated;
     }
   }
 
-  .drawPileCount,
-  .bottomPileCount {
+  .pileGlow {
     position: absolute;
-    bottom: -1.75rem;
-    padding: 0.15rem 0.6rem;
-    border-radius: 999px;
-    background: var(--secondary-bg-color);
-    color: var(--text-color);
-    font-size: 0.8rem;
-    white-space: nowrap;
+    inset: -8px -6px -6px -8px;
+    border-radius: 12px;
+    box-shadow: 0 0 0 1px var(--primary-border);
+    animation: pileGlow 1.8s ease-in-out infinite;
+    pointer-events: none;
+  }
+}
+
+@keyframes pileGlow {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.pileLabel {
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.cutDeck {
+  position: relative;
+
+  &.clickable {
+    cursor: pointer;
   }
 
-  .bottomPile {
-    opacity: 0.75;
-  }
-
-  .trickGroup {
+  .cutDeckCard {
     position: absolute;
+    top: 16px;
+    left: 0;
 
-    .trickCardsRow {
-      display: flex;
-      flex-direction: row;
-    }
-
-    .trickCard {
-      transform: scale(0.55);
-
-      &:not(:first-child) {
-        margin-left: -68px;
-      }
-    }
-
-    &.bottom {
-      bottom: 0;
-    }
-
-    &.top {
-      top: 0;
-      transform: rotate(180deg);
-    }
-
-    &.left {
-      left: 0;
-      transform: rotate(90deg);
-    }
-
-    &.right {
-      right: 0;
-      transform: rotate(-90deg);
+    img {
+      width: $card-sm;
+      max-width: none;
+      image-rendering: pixelated;
     }
   }
 }
 
-.bgBlur {
+// each player's play sits on their side of the table, cards upright
+.trickGroup {
   position: absolute;
-  width: 100vw;
-  height: 100vh;
-  background: #000000;
-  opacity: 0.3;
+  display: flex;
+
+  > :not(:first-child) {
+    margin-left: -34px;
+  }
+
+  &.bottom {
+    bottom: 0;
+    left: 0;
+    right: 0;
+    justify-content: center;
+  }
+
+  &.top {
+    top: 0;
+    left: 0;
+    right: 0;
+    justify-content: center;
+  }
+
+  &.left {
+    top: 0;
+    bottom: 0;
+    left: 0;
+    align-items: center;
+  }
+
+  &.right {
+    top: 0;
+    bottom: 0;
+    right: 0;
+    align-items: center;
+  }
+
+  &.won .cardImage {
+    filter: drop-shadow(0 0 4px rgba(63, 198, 121, 0.75));
+  }
 }
 
-.settingsGearButton {
+.trickPoints {
   position: absolute;
-  top: 1rem;
-  right: 1rem;
-  width: 2.25rem;
-  height: 2.25rem;
-  border-radius: 50%;
-  border: white 2px solid;
-  font-size: 1.1rem;
-  z-index: 5;
+  top: 50%;
+  left: 50%;
+  translate: -50% -50%;
+  padding: 0.25rem 0.65rem;
+  border: 1px solid var(--primary-border);
+  border-radius: 999px;
+  background: var(--primary-soft);
+  color: var(--primary-color);
+  font-size: 0.8rem;
+  font-weight: 600;
 }
 
-.settingsModal {
-  position: absolute;
-  margin: 10rem 0 0 0;
-  width: 50%;
-  padding: 1rem;
-  border: white 2px solid;
-  border-radius: $border-radius-md;
+// ---- overlays: round summary + settings ----
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+
+  background: rgba(8, 9, 10, 0.55);
+  backdrop-filter: blur(6px);
+}
+
+.summaryPanel {
+  @include panel;
+  width: min(26rem, 100%);
+  padding: 1.6rem 1.75rem;
+
   display: flex;
   flex-direction: column;
-  align-items: center;
+  gap: 1.2rem;
+
+  .summaryTitle {
+    margin-top: -0.6rem;
+    font-size: 1.3rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+
+  .summaryPoints {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    font-size: 0.8rem;
+  }
+
+  .summaryPointsHeader {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+  }
+
+  .summaryPointsValue {
+    font-size: 2.2rem;
+    font-weight: 600;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .summaryBottom {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    font-size: 0.78rem;
+  }
+
+  .summaryBottomCards {
+    display: flex;
+
+    > :not(:first-child) {
+      margin-left: -24px;
+    }
+  }
+
+  .summaryActions {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    min-height: 2.1rem;
+    font-size: 0.8rem;
+  }
+}
+
+.settingsPanel {
+  @include panel;
+  width: min(46rem, 100%);
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
+  padding: 1.5rem 1.75rem;
+
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  font-size: 0.85rem;
 
   .settingsHeader {
-    width: 100%;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+  }
+
+  .settingsTitle {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+
+    h2 {
+      font-size: 1.3rem;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+    }
+  }
+
+  .settingsHeaderRight {
     display: flex;
     align-items: center;
-    justify-content: center;
-    position: relative;
+    gap: 0.5rem;
+  }
 
-    .closeSettingsButton {
-      position: absolute;
-      right: 0;
-      border-radius: 50%;
-      width: 1.75rem;
-      height: 1.75rem;
+  .roomCode {
+    @include chip;
+    gap: 0.5rem;
+    transition: border-color 150ms ease;
+
+    &:hover {
+      border-color: var(--border-strong);
     }
+
+    .roomCodeValue {
+      font-weight: 600;
+      letter-spacing: 0.12em;
+    }
+  }
+
+  .pausedNote {
+    padding: 0.65rem 0.9rem;
+    border: 1px solid var(--primary-border);
+    border-radius: $border-radius-md;
+    background: var(--primary-soft);
+    font-size: 0.8rem;
   }
 
   .settingsBody {
-    width: 100%;
+    display: grid;
+    grid-template-columns: 1.15fr 1fr;
+    gap: 2rem;
+
+    @media (max-width: 640px) {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .settingsSection {
     display: flex;
-    flex-direction: row;
-    gap: 1rem;
+    flex-direction: column;
+    gap: 0.6rem;
+    min-width: 0;
+  }
 
-    .gameRules {
+  .settingsNote {
+    color: var(--text-muted);
+    font-size: 0.72rem;
+  }
+
+  .playerList {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+  }
+
+  .playerRow,
+  .emptySeat {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    height: 2.5rem;
+    padding: 0 0.5rem 0 0.8rem;
+    border-radius: $border-radius-md;
+  }
+
+  .playerRow {
+    border: 1px solid var(--border);
+    background: var(--surface);
+
+    &.me {
+      border-color: var(--border-strong);
+    }
+  }
+
+  .emptySeat {
+    border: 1px dashed var(--border);
+    color: var(--text-muted);
+    font-size: 0.78rem;
+  }
+
+  .teamSwatch {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--primary-color);
+
+    &.alt {
+      background: var(--text-muted);
+    }
+  }
+
+  .playerRowName {
+    overflow: hidden;
+    font-weight: 500;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
+  .tags {
+    display: flex;
+    gap: 0.25rem;
+    margin-right: auto;
+  }
+
+  .tag {
+    padding: 0.05rem 0.45rem;
+    border-radius: 999px;
+    background: var(--surface-hover);
+    color: var(--text-muted);
+    font-size: 0.66rem;
+  }
+
+  .reorderButtons {
+    display: flex;
+    gap: 0.1rem;
+  }
+
+  .nameForm {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 0.4rem;
+
+    input {
       flex: 1;
-      display: flex;
-      flex-direction: column;
-      gap: 0.35rem;
-      max-height: 20rem;
-      overflow-y: auto;
+      width: auto;
+      min-width: 0;
+      height: 2.1rem;
+      padding: 0 0.9rem;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      background: var(--surface);
+      font-size: 0.82rem;
+      transition: border-color 150ms ease;
 
-      .mustPlayHeader {
-        font-weight: bold;
-        margin-bottom: 0.25rem;
-      }
-
-      .mustPlayRow {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 0.5rem;
-
-        .mustPlayLevel {
-          width: 1.5rem;
-        }
-
-        .mustPlayOptions {
-          display: flex;
-          gap: 0.25rem;
-
-          .mustPlayOption {
-            padding: 0.15rem 0.5rem;
-            border-radius: $border-radius-md;
-
-            &.active {
-              background: white;
-              color: black;
-            }
-          }
-        }
+      &:focus {
+        border-color: var(--primary-border);
       }
     }
+  }
 
-    .lobbyRules {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      gap: 1rem;
+  .mustPlayList {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+  }
 
-      .roomIdDiv {
-        display: flex;
-        gap: 2rem;
+  .mustPlayRow {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+
+    .mustPlayLevel {
+      width: 1.5rem;
+      color: var(--text-muted);
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+    }
+  }
+
+  .segmented {
+    display: inline-flex;
+    padding: 2px;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+
+    .segment {
+      padding: 0.15rem 0.65rem;
+      border-radius: 999px;
+      color: var(--text-muted);
+      font-size: 0.72rem;
+      transition:
+        background 150ms ease,
+        color 150ms ease;
+
+      &:hover:not(:disabled) {
+        color: var(--text-color);
       }
 
-      .playerProfile {
-        border: white 2px solid;
-        border-radius: $border-radius-md;
-        padding: 0.5rem;
-
-        form {
-          display: flex;
-          justify-content: space-between;
-
-          input:hover {
-            text-decoration: underline;
-          }
-
-          button {
-            padding: 0 0.5rem 0 0.5rem;
-          }
-        }
+      &.active {
+        background: var(--surface-hover);
+        color: var(--text-color);
       }
 
-      .playerList {
-        border: white 2px solid;
-        border-radius: $border-radius-md;
-
-        > * {
-          padding: 0.5rem;
-        }
-
-        > *:not(:last-child) {
-          border-bottom: white 2px solid;
-        }
-
-        .playerRow {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          gap: 0.5rem;
-
-          .teamLabel {
-            opacity: 0.7;
-            font-size: 0.85em;
-          }
-
-          .reorderButtons {
-            display: flex;
-            gap: 0.25rem;
-
-            button {
-              padding: 0 0.4rem;
-            }
-          }
-        }
+      &:disabled {
+        cursor: default;
       }
     }
+  }
+
+  .settingsFooter {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding-top: 0.25rem;
+  }
+
+  .settingsFooterRight {
+    display: flex;
+    gap: 0.5rem;
   }
 }

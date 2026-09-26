@@ -1,15 +1,25 @@
-import { useState } from "react";
-import { clsx } from "clsx";
-import type { AckResult, Card } from "@tractor/shared";
+import { useEffect, useState } from "react";
+import {
+  getPlayError,
+  type AckResult,
+  type Card,
+  type GameState,
+  type RoundState,
+} from "@tractor/shared";
 import { useGameSocket } from "../services/useGameSocket";
 import { useRoomActions } from "../services/useRoomActions";
+import { drawCard } from "../services/gameActions";
 import ActionBar, { type ActionDescriptor } from "./ActionBar";
-import CardHand from "./CardHand";
+import OpponentSeat from "./OpponentSeat";
+import Scoreboard from "./Scoreboard";
 import TableCenter from "./TableCenter";
 import styles from "./GamePage.module.scss";
 import {
   canCallTrump,
+  canOverturnTrump,
   canReinforceTrump,
+  getBreakerId,
+  getCallError,
   getKnownTrumpSuit,
   getSeatOrientation,
   isCardSelected,
@@ -17,13 +27,27 @@ import {
   toggleCard,
 } from "./GamePageHelpers";
 
-export default function GameBoard() {
-  const { playerId, gameState } = useGameSocket();
+type Props = {
+  // keyboard shortcuts are off while a modal/overlay is covering the board
+  isInteractive: boolean;
+};
+
+/** whoever the table is currently waiting on */
+function getActorId(gameState: GameState, round: RoundState): string | null {
+  if (round.phase === "breaking")
+    return getBreakerId(gameState.playerOrder, round.onPlayer);
+  if (round.phase === "bottoming") return round.bottomPlayer;
+  return round.currentTurn;
+}
+
+export default function GameBoard({ isInteractive }: Props) {
+  const { playerId, gameState, pushError } = useGameSocket();
   const roomActions = useRoomActions();
   const currentRound = gameState?.currentRound;
 
   const [selectedCards, setSelectedCards] = useState<Card[]>([]);
   const [sortEnabled, setSortEnabled] = useState(true);
+  const [autoDraw, setAutoDraw] = useState(false);
   const [prevPhase, setPrevPhase] = useState(currentRound?.phase);
 
   // stale selections from a previous phase (e.g. someone else's call trump
@@ -34,6 +58,29 @@ export default function GameBoard() {
     setSelectedCards([]);
   }
 
+  const roomId = gameState?.roomId;
+  const isLive = gameState?.phase === "playing" && !gameState.paused;
+  const isMyDraw =
+    isLive &&
+    currentRound?.phase === "drawing" &&
+    currentRound.currentTurn === playerId;
+  const drawPileSize = currentRound?.drawPile.length;
+
+  useEffect(() => {
+    if (!autoDraw || !isMyDraw || !roomId) return;
+    const timer = setTimeout(async () => {
+      const res = await drawCard(roomId);
+      if (!res.ok) {
+        pushError(res.error);
+        setAutoDraw(false);
+      }
+    }, 220);
+    return () => clearTimeout(timer);
+  }, [autoDraw, isMyDraw, drawPileSize, roomId, pushError]);
+
+  const actions: ActionDescriptor[] = [];
+  let hint: string | null = null;
+
   async function runAction(
     fn: () => Promise<AckResult>,
     onSuccess?: () => void,
@@ -41,139 +88,190 @@ export default function GameBoard() {
     const res = await fn();
     if (res.ok) onSuccess?.();
   }
+  const clearSelection = () => setSelectedCards([]);
 
-  function handleCardClick(card: Card) {
-    setSelectedCards((prev) => toggleCard(card, prev));
-  }
+  const primaryAction = () =>
+    actions.find((a) => a.primary && !a.disabled) ?? null;
+
+  useEffect(() => {
+    if (!isInteractive) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== "Enter" || e.repeat) return;
+      const target = e.target as HTMLElement | null;
+      if (target?.closest("input, textarea, button")) return;
+      const action = primaryAction();
+      if (!action) return;
+      e.preventDefault();
+      action.onClick();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  });
 
   if (!gameState || !currentRound) {
     return <p>no game state :(</p>;
   }
 
+  const round = currentRound;
+  const actorId = getActorId(gameState, round);
+  const isMyTurn = actorId === playerId;
   const isBottomingMe =
-    currentRound.phase === "bottoming" &&
-    currentRound.bottomPlayer === playerId;
+    round.phase === "bottoming" && round.bottomPlayer === playerId;
 
-  const rawHand = currentRound.hands[playerId] ?? [];
-  const myHand = isBottomingMe
-    ? [...rawHand, ...currentRound.bottom]
-    : rawHand;
+  const rawHand = round.hands[playerId] ?? [];
+  const myHand = isBottomingMe ? [...rawHand, ...round.bottom] : rawHand;
   const displayHand = sortEnabled
-    ? sortHand(myHand, getKnownTrumpSuit(currentRound), currentRound.trumpRank)
+    ? sortHand(myHand, getKnownTrumpSuit(round), round.trumpRank)
     : myHand;
+  const hasSelection = selectedCards.length > 0;
 
-  const actions: ActionDescriptor[] = [];
+  switch (round.phase) {
+    case "breaking":
+      if (isMyTurn) {
+        hint = "click the deck to cut it, as many times as you like";
+        actions.push({
+          id: "finish-breaking",
+          label: "Done cutting",
+          primary: true,
+          onClick: () => runAction(roomActions.finishBreaking),
+        });
+      }
+      break;
 
-  if (currentRound.phase === "breaking") {
-    // the breaker is whoever sits right before the dealer (onPlayer)
-    const { playerOrder } = gameState;
-    const breakerId =
-      playerOrder[
-        (playerOrder.indexOf(currentRound.onPlayer) -
-          1 +
-          playerOrder.length) %
-          playerOrder.length
-      ];
-    if (breakerId === playerId) {
-      actions.push({
-        id: "finish-breaking",
-        label: "Finish Breaking",
-        onClick: () => runAction(roomActions.finishBreaking),
-      });
-    }
-  } else if (currentRound.phase === "drawing") {
-    if (currentRound.currentTurn === playerId) {
+    case "drawing": {
+      const isCaller = round.callPlayer === playerId;
+      const callReady = isCaller
+        ? canReinforceTrump(selectedCards, round, playerId)
+        : canCallTrump(selectedCards, round, playerId);
+      if (hasSelection && !callReady)
+        hint = isCaller
+          ? "reinforce with a bigger set of your call card"
+          : getCallError(selectedCards, round);
+
+      // draw stays mounted (just disabled) between turns so it doesn't
+      // flicker in and out while everyone draws; a ready call takes over
+      // as the primary (enter key) action
       actions.push({
         id: "draw",
-        label: "Draw Card",
+        label: "Draw",
+        primary: !!isMyDraw && !callReady,
+        disabled: !isMyDraw,
         onClick: () => runAction(roomActions.drawCard),
       });
+      actions.push(
+        isCaller
+          ? {
+              id: "reinforce-trump",
+              label: "Reinforce",
+              primary: callReady,
+              disabled: !callReady,
+              onClick: () =>
+                runAction(
+                  () => roomActions.reinforceTrump(selectedCards),
+                  clearSelection,
+                ),
+            }
+          : {
+              id: "call-trump",
+              label: "Call trump",
+              primary: callReady,
+              disabled: !callReady,
+              onClick: () =>
+                runAction(
+                  () => roomActions.callTrump(selectedCards),
+                  clearSelection,
+                ),
+            },
+      );
+      break;
     }
-    if (currentRound.callPlayer === playerId) {
-      actions.push({
-        id: "reinforce-trump",
-        label: "Reinforce Trump",
-        disabled: !canReinforceTrump(selectedCards, currentRound, playerId),
-        onClick: () =>
-          runAction(
-            () => roomActions.reinforceTrump(selectedCards),
-            () => setSelectedCards([]),
-          ),
-      });
-    } else {
-      actions.push({
-        id: "call-trump",
-        label: "Call Trump",
-        disabled: !canCallTrump(selectedCards, currentRound, playerId),
-        onClick: () =>
-          runAction(
-            () => roomActions.callTrump(selectedCards),
-            () => setSelectedCards([]),
-          ),
-      });
-    }
-  } else if (currentRound.phase === "bottoming" && isBottomingMe) {
-    actions.push({
-      id: "confirm-bottom",
-      label: `Confirm Bottom (${selectedCards.length}/8)`,
-      disabled: selectedCards.length !== 8,
-      onClick: () =>
-        runAction(
-          () =>
-            roomActions.setBottom(
-              selectedCards,
-              myHand.filter((c) => !isCardSelected(c, selectedCards)),
-            ),
-          () => setSelectedCards([]),
-        ),
-    });
-  } else if (
-    (currentRound.phase === "asking" ||
-      currentRound.phase === "asking_before_bottoming") &&
-    currentRound.currentTurn === playerId
-  ) {
-    actions.push({
-      id: "overturn-trump",
-      label: "Overturn Trump",
-      disabled: selectedCards.length === 0,
-      onClick: () =>
-        runAction(
-          () => roomActions.overturnTrump(selectedCards),
-          () => setSelectedCards([]),
-        ),
-    });
-    actions.push({
-      id: "skip-ask",
-      label: "Skip",
-      onClick: () => runAction(roomActions.skipAsk),
-    });
-  } else if (
-    currentRound.phase === "playing" &&
-    currentRound.currentTurn === playerId
-  ) {
-    actions.push({
-      id: "play-trick",
-      label: "Play Trick",
-      disabled: selectedCards.length === 0,
-      onClick: () =>
-        runAction(
-          () => roomActions.playTrick(selectedCards),
-          () => setSelectedCards([]),
-        ),
-    });
-  }
 
-  const canDraw =
-    currentRound.phase === "drawing" && currentRound.currentTurn === playerId;
+    case "asking":
+    case "asking_before_bottoming": {
+      if (!isMyTurn) break;
+      const canOverturn = canOverturnTrump(selectedCards, round);
+      if (hasSelection) hint = getCallError(selectedCards, round);
+      actions.push({
+        id: "overturn-trump",
+        label: "Overturn",
+        primary: canOverturn,
+        disabled: !canOverturn,
+        onClick: () =>
+          runAction(
+            () => roomActions.overturnTrump(selectedCards),
+            clearSelection,
+          ),
+      });
+      actions.push({
+        id: "skip-ask",
+        label: "Pass",
+        primary: !canOverturn,
+        onClick: () => runAction(roomActions.skipAsk, clearSelection),
+      });
+      break;
+    }
+
+    case "bottoming":
+      if (!isBottomingMe) break;
+      hint =
+        selectedCards.length === 8
+          ? "ready to bury"
+          : `select 8 cards to bury · ${selectedCards.length}/8`;
+      actions.push({
+        id: "confirm-bottom",
+        label: "Bury",
+        primary: true,
+        disabled: selectedCards.length !== 8,
+        onClick: () =>
+          runAction(
+            () =>
+              roomActions.setBottom(
+                selectedCards,
+                myHand.filter((c) => !isCardSelected(c, selectedCards)),
+              ),
+            clearSelection,
+          ),
+      });
+      break;
+
+    case "playing": {
+      if (!isMyTurn || !round.trumpSuit) break;
+      const leadTrick = round.currentTricks[0]?.trick ?? null;
+      const playError = getPlayError(
+        selectedCards,
+        rawHand,
+        leadTrick,
+        round.trumpSuit,
+        round.trumpRank,
+      );
+      if (hasSelection) hint = playError;
+      else
+        hint = leadTrick
+          ? `play ${leadTrick.length} card${leadTrick.length === 1 ? "" : "s"}`
+          : "select cards to lead";
+      actions.push({
+        id: "play-trick",
+        label: "Play",
+        primary: true,
+        disabled: playError !== null,
+        onClick: () =>
+          runAction(() => roomActions.playTrick(selectedCards), clearSelection),
+      });
+      break;
+    }
+  }
 
   return (
     <div className={styles.gameBoard}>
+      <Scoreboard gameState={gameState} playerId={playerId} />
+
       <TableCenter
         gameState={gameState}
-        round={currentRound}
+        round={round}
         playerId={playerId}
-        canDraw={canDraw}
+        canDraw={!!isMyDraw}
         onDrawPile={() => runAction(roomActions.drawCard)}
+        onCut={roomActions.breakDeck}
       />
 
       {gameState.playerOrder
@@ -184,36 +282,37 @@ export default function GameBoard() {
             playerId,
             id,
           );
+          if (orientation === "bottom") return null;
           return (
-            <div
+            <OpponentSeat
               key={id}
-              className={clsx(styles.opponentSeat, styles[orientation])}
-            >
-              <span
-                className={clsx(
-                  styles.playerLabel,
-                  currentRound.currentTurn === id && styles.activeTurn,
-                )}
-              >
-                {gameState.players[id]?.name ?? id}
-              </span>
-              <CardHand
-                cards={currentRound.hands[id] ?? []}
-                isFaceDown={true}
-                orientation={orientation}
-                isSelectable={false}
-              />
-            </div>
+              player={gameState.players[id]}
+              cardCount={round.hands[id]?.length ?? 0}
+              orientation={orientation}
+              isTurn={actorId === id}
+              isPartner={orientation === "top"}
+            />
           );
         })}
 
       <ActionBar
+        name={gameState.players[playerId]?.name ?? "you"}
+        isMyTurn={isMyTurn}
         cards={displayHand}
         selectedCards={selectedCards}
-        onCardClick={handleCardClick}
+        highlightedCards={isBottomingMe ? round.bottom : []}
+        onCardClick={(card) =>
+          setSelectedCards((prev) => toggleCard(card, prev))
+        }
         sortEnabled={sortEnabled}
         onToggleSort={() => setSortEnabled((prev) => !prev)}
+        autoDraw={
+          round.phase === "drawing"
+            ? { enabled: autoDraw, onToggle: () => setAutoDraw((v) => !v) }
+            : null
+        }
         actions={actions}
+        hint={hint}
       />
     </div>
   );

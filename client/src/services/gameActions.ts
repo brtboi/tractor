@@ -65,6 +65,10 @@ export function startTestGame(roomId: string): Promise<AckResult> {
   return socket.emitWithAck("START_TEST_GAME", { roomId });
 }
 
+export function nextRound(roomId: string): Promise<AckResult> {
+  return socket.emitWithAck("NEXT_ROUND", { roomId });
+}
+
 export function breakDeck(roomId: string, breakAt: number): Promise<AckResult> {
   return socket.emitWithAck("BREAK_DECK", { roomId, breakAt });
 }

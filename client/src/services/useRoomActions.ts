@@ -9,6 +9,7 @@ import {
   drawCard,
   finishBreaking,
   leaveRoom,
+  nextRound,
   overturnTrump,
   pauseGame,
   playTrick,
@@ -60,6 +61,7 @@ export function useRoomActions() {
       return res;
     },
 
+    nextRound: () => run(nextRound(roomId)),
     breakDeck: (breakAt: number) => run(breakDeck(roomId, breakAt)),
     finishBreaking: () => run(finishBreaking(roomId)),
     drawCard: () => run(drawCard(roomId)),
