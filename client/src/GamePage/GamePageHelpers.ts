@@ -8,12 +8,19 @@ import {
   type RoundState,
   type Suit,
 } from "@tractor/shared";
+import type { CardSize } from "./CardComponent";
 
 export type Orientation = "top" | "bottom" | "left" | "right";
 
 // sprite sheet is 53x75 per card
 export const CARD_WIDTH = 53;
 export const CARD_HEIGHT = 75;
+
+export const CARD_SCALE: Record<CardSize, number> = { sm: 1, md: 1.5, lg: 2 };
+
+export function isRedSuit(suit: Suit): boolean {
+  return suit === "Hearts" || suit === "Diamonds";
+}
 
 const SUIT_ORDER: Record<Suit, number> = {
   Spades: 0,
@@ -152,15 +159,6 @@ export function isTrumpUncalled(round: RoundState): boolean {
 export function getKnownTrumpSuit(round: RoundState): Suit {
   if (isTrumpUncalled(round)) return "Joker";
   return round.trumpSuit ?? "Joker";
-}
-
-export function describeTrump(round: RoundState): string {
-  const rank = levelLabel(round.trumpRank);
-  if (isTrumpUncalled(round)) return `${rank} · uncalled`;
-  const suit = getKnownTrumpSuit(round);
-  return suit === "Joker"
-    ? `${rank} · no trump`
-    : `${rank}${SUIT_SYMBOLS[suit]}`;
 }
 
 export function describeCard(card: Card): string {

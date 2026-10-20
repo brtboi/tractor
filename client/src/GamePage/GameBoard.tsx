@@ -22,6 +22,7 @@ import {
   getCallError,
   getKnownTrumpSuit,
   getSeatOrientation,
+  getTeamIndex,
   isCardSelected,
   sortHand,
   toggleCard,
@@ -269,6 +270,7 @@ export default function GameBoard({ isInteractive }: Props) {
         gameState={gameState}
         round={round}
         playerId={playerId}
+        actorId={actorId}
         canDraw={!!isMyDraw}
         onDrawPile={() => runAction(roomActions.drawCard)}
         onCut={roomActions.breakDeck}
@@ -286,7 +288,9 @@ export default function GameBoard({ isInteractive }: Props) {
           return (
             <OpponentSeat
               key={id}
+              playerId={id}
               player={gameState.players[id]}
+              team={getTeamIndex(gameState, id)}
               cardCount={round.hands[id]?.length ?? 0}
               orientation={orientation}
               isTurn={actorId === id}
@@ -297,6 +301,7 @@ export default function GameBoard({ isInteractive }: Props) {
 
       <ActionBar
         name={gameState.players[playerId]?.name ?? "you"}
+        team={getTeamIndex(gameState, playerId)}
         isMyTurn={isMyTurn}
         cards={displayHand}
         selectedCards={selectedCards}

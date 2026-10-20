@@ -1,4 +1,5 @@
 import { motion } from "framer-motion";
+import { clsx } from "clsx";
 import type { GameState, RoundSummary as Summary } from "@tractor/shared";
 import CardComponent from "./CardComponent";
 import { cardKey, levelLabel } from "./GamePageHelpers";
@@ -57,7 +58,7 @@ export default function RoundSummary({
         <span className={styles.eyebrow}>
           {isGameOver ? "Game over" : `Round ${summary.roundNumber + 1}`}
         </span>
-        <h2 className={styles.summaryTitle}>
+        <h2 className={clsx(styles.panelTitle, styles.summaryTitle)}>
           {isGameOver
             ? `${gameState.teams[gameState.winner]?.name ?? "Someone"} wins`
             : describeResult(gameState, summary)}

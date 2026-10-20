@@ -1,23 +1,40 @@
-// TODO: find a font
 // TODO: light mode support
 
+// palette is pulled from the pixel card sprites (ink, navy, berry, gold,
+// paper) so the chrome around the cards feels like the same set
 :root {
-  --bg-color: #151618;
-  --secondary-bg-color: #2a2d31;
-  --surface: rgba(255, 255, 255, 0.04);
-  --surface-hover: rgba(255, 255, 255, 0.08);
-  --surface-raised: #1c1e21;
-  --border: rgba(255, 255, 255, 0.08);
-  --border-strong: rgba(255, 255, 255, 0.18);
-  --text-color: #e6e6e6;
-  --text-muted: #8b9097;
-  --text-secondary: #8b9097;
-  --primary-color: #3fc679;
-  --primary-soft: rgba(63, 198, 121, 0.12);
-  --primary-soft-hover: rgba(63, 198, 121, 0.2);
-  --primary-border: rgba(63, 198, 121, 0.35);
+  --bg-color: #0f1124;
+  --secondary-bg-color: #1c2147;
+  --felt: #161a36;
+  --felt-light: #1e2448;
+  --surface: rgba(173, 180, 196, 0.06);
+  --surface-hover: rgba(173, 180, 196, 0.11);
+  --surface-raised: #181c38;
+  --border: rgba(173, 180, 196, 0.13);
+  --border-strong: rgba(173, 180, 196, 0.26);
+  --bevel: rgba(4, 5, 16, 0.55);
+
+  --text-color: #f2f2f2;
+  --text-muted: #8e94b2;
+  --text-secondary: #8e94b2;
+
+  --paper: #f2f2f2;
+  --paper-shade: #d9d9d9;
+  --ink: #36325d;
+  --navy: #1c2147;
+
+  --primary-color: #dea726;
+  --primary-soft: rgba(222, 167, 38, 0.12);
+  --primary-soft-hover: rgba(222, 167, 38, 0.2);
+  --primary-border: rgba(222, 167, 38, 0.42);
+
+  --team-a: #678ad6;
+  --team-b: #c9677d;
+  --danger: #c9677d;
+  --danger-soft: rgba(201, 103, 125, 0.14);
 
   --font-main: "Inter", system-ui, -apple-system, sans-serif;
+  --font-pixel: "Tiny5", var(--font-main);
 }
 
 *,
@@ -42,6 +59,10 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+::selection {
+  background: var(--primary-soft-hover);
+}
+
 img, picture, video, canvas, svg {
   display: block;
   max-width: 100%;
@@ -63,4 +84,9 @@ select {
 
 button {
   cursor: pointer;
+}
+
+:focus-visible {
+  outline: 2px solid var(--primary-border);
+  outline-offset: 2px;
 }

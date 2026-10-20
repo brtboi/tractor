@@ -1,10 +1,13 @@
+import { useRef } from "react";
 import { motion } from "framer-motion";
 import clsx from "clsx";
 import { cardToString, type Card } from "@tractor/shared";
 import { cardKey, type Orientation } from "./GamePageHelpers";
+import { useFlyIn, type FlyFrom } from "./useFlyIn";
 import styles from "./GamePage.module.scss";
 
-export type CardSize = "sm" | "md";
+// sm = 1x sprite, md = 1.5x, lg = 2x
+export type CardSize = "sm" | "md" | "lg";
 
 type BaseProps = {
   orientation: Orientation;
@@ -19,6 +22,8 @@ type BaseProps = {
   shareLayout?: boolean;
   // drop in from above when mounted; off when a parent animates entry
   animateEntry?: boolean;
+  // when added to an existing hand, glide in from this spot on the board
+  flyFrom?: FlyFrom | null;
   onClick?: () => void;
 };
 
@@ -39,6 +44,10 @@ const spring = {
   mass: 0.8,
 } as const;
 
+const SPRITE_PREFIX = "/cardSprites/";
+// TODO: different card sprite themes
+const CARD_BACK = `${SPRITE_PREFIX}back_red.png`;
+
 export default function CardComponent({
   isFaceDown,
   orientation,
@@ -49,27 +58,35 @@ export default function CardComponent({
   size = "md",
   shareLayout = true,
   animateEntry = true,
+  flyFrom,
   onClick,
 }: Props) {
-  // TODO: different card sprite themes
-  const spritePathPrefix = "/cardSprites/";
-  const spritePath: string = isFaceDown
-    ? "back_red.png"
-    : `${cardToString(card)}.png`;
+  const anchorRef = useRef<HTMLDivElement>(null);
+  const fly = useFlyIn(anchorRef, flyFrom);
+  const spriteName = isFaceDown ? null : cardToString(card);
+  const flying = !!flyFrom;
 
   return (
     <motion.div
+      ref={anchorRef}
       layout
       layoutId={!isFaceDown && shareLayout ? cardKey(card) : undefined}
+      // a card travelling hand -> table should stay solid, not fade through
+      layoutCrossfade={false}
       initial={
-        !animateEntry
+        !animateEntry || flying
           ? false
           : isFaceDown
             ? { opacity: 0 }
             : { opacity: 0, y: -40 }
       }
-      animate={{ opacity: 1, y: isSelected ? -18 : 0 }}
-      exit={{ opacity: 0, y: 30 }}
+      animate={{ opacity: 1, y: isSelected ? -20 : 0 }}
+      // face-down hands are rotated, so a sideways drift would look random
+      exit={
+        isFaceDown
+          ? { opacity: 0, scale: 0.9, transition: { duration: 0.2 } }
+          : { opacity: 0, y: -30, transition: { duration: 0.2 } }
+      }
       transition={spring}
       className={clsx(
         styles.cardComponent,
@@ -81,12 +98,24 @@ export default function CardComponent({
       )}
       onClick={onClick}
     >
-      <img
-        className={styles.cardImage}
-        src={spritePathPrefix + spritePath}
-        alt={isFaceDown ? "card back" : `card ${spritePath}`}
-        draggable={false}
-      />
+      <motion.div className={styles.cardFly} style={fly.style}>
+        <img
+          className={styles.cardImage}
+          src={spriteName ? `${SPRITE_PREFIX}${spriteName}.png` : CARD_BACK}
+          alt={spriteName ? `card ${spriteName}.png` : "card back"}
+          draggable={false}
+        />
+        {/* face-up cards are drawn face down, so turn over mid-flight */}
+        {flying && spriteName && (
+          <motion.img
+            className={clsx(styles.cardImage, styles.cardBackOverlay)}
+            src={CARD_BACK}
+            alt=""
+            draggable={false}
+            style={{ opacity: fly.progress }}
+          />
+        )}
+      </motion.div>
     </motion.div>
   );
 }

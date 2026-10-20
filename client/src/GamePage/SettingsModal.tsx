@@ -102,7 +102,7 @@ export default function SettingsModal({
         <div className={styles.settingsHeader}>
           <div className={styles.settingsTitle}>
             <span className={styles.eyebrow}>Tractor</span>
-            <h2>{title}</h2>
+            <h2 className={styles.panelTitle}>{title}</h2>
           </div>
           <div className={styles.settingsHeaderRight}>
             <button
@@ -154,8 +154,8 @@ export default function SettingsModal({
                   >
                     <span
                       className={clsx(
-                        styles.teamSwatch,
-                        index % 2 === 1 && styles.alt,
+                        styles.teamMarker,
+                        index % 2 === 1 && styles.teamB,
                       )}
                       title={state.teams[index % 2]?.name}
                     />

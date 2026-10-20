@@ -1,7 +1,23 @@
 @use "../_variables.scss" as *;
 
-$card-md: calc(1.5 * 53px);
-$card-sm: 53px;
+// sprite sheet is 53x75 per card; sizes are whole/half multiples of it
+$card-w: 53px;
+$card-h: 75px;
+
+@mixin card-size-vars {
+  &.sm {
+    --card-w: #{$card-w};
+    --card-h: #{$card-h};
+  }
+  &.md {
+    --card-w: #{$card-w * 1.5};
+    --card-h: #{$card-h * 1.5};
+  }
+  &.lg {
+    --card-w: #{$card-w * 2};
+    --card-h: #{$card-h * 2};
+  }
+}
 
 // ---- shared bits ----
 
@@ -33,10 +49,17 @@ $card-sm: 53px;
   @include button;
   border-color: transparent;
   background: transparent;
+  box-shadow: none;
   color: var(--text-muted);
 
   &:hover:not(:disabled) {
+    border-color: transparent;
+    background: var(--surface);
     color: var(--text-color);
+  }
+
+  &:active:not(:disabled) {
+    translate: none;
   }
 }
 
@@ -45,7 +68,7 @@ $card-sm: 53px;
   place-items: center;
   width: 1.75rem;
   height: 1.75rem;
-  border-radius: 50%;
+  border-radius: $border-radius-sm;
   color: var(--text-muted);
   font-size: 0.8rem;
   transition:
@@ -63,17 +86,60 @@ $card-sm: 53px;
   }
 }
 
+// paper badge drawn like a card's corner index
+.miniCard {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  min-width: 1.6rem;
+  height: 1.95rem;
+  padding: 0 0.3rem;
+
+  border: 1px solid var(--ink);
+  border-radius: 3px;
+  background: var(--paper);
+  box-shadow:
+    inset -1px -2px 0 var(--paper-shade),
+    0 2px 0 var(--bevel);
+  color: var(--ink);
+
+  @include pixel-font;
+  font-size: 1rem;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+
+  &.red {
+    color: #9b4b5d;
+  }
+
+  &.mutedCard {
+    opacity: 0.55;
+  }
+
+  .miniSuit {
+    font-family: var(--font-main);
+    font-size: 0.8rem;
+  }
+}
+
 // ---- cards ----
 
-// framer-motion drives transform on .cardComponent directly, so hover lift
-// and highlights live on the inner image instead
+// framer-motion drives transform on .cardComponent (selection lift, layout)
+// and .cardFly (flying in), so hover lift and highlights live on the image
 .cardComponent {
+  @include card-size-vars;
   position: relative;
   flex-shrink: 0;
   cursor: default;
 
+  .cardFly {
+    position: relative;
+  }
+
   .cardImage {
     display: block;
+    width: var(--card-w);
     max-width: none;
     image-rendering: pixelated;
     transition:
@@ -81,37 +147,36 @@ $card-sm: 53px;
       filter 180ms ease;
   }
 
-  &.md .cardImage {
-    width: $card-md;
-  }
-
-  &.sm .cardImage {
-    width: $card-sm;
+  .cardBackOverlay {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
   }
 
   &.selectable {
     cursor: pointer;
 
     &:hover .cardImage {
-      transform: translateY(-6px);
+      transform: translateY(-8px);
     }
   }
 
+  // crisp 2px outline rather than a soft glow, to match the sprites
   &.selected .cardImage {
-    filter: drop-shadow(0 0 3px rgba(63, 198, 121, 0.9))
-      drop-shadow(0 6px 10px rgba(0, 0, 0, 0.35));
+    filter: drop-shadow(2px 0 0 var(--primary-color))
+      drop-shadow(-2px 0 0 var(--primary-color))
+      drop-shadow(0 2px 0 var(--primary-color))
+      drop-shadow(0 -2px 0 var(--primary-color))
+      drop-shadow(0 10px 8px rgba(0, 0, 0, 0.35));
   }
 
   // cards that just came up from the bottom while burying
   &.highlighted::after {
     content: "";
     position: absolute;
-    top: -9px;
-    left: 11px;
-    width: 5px;
-    height: 5px;
-    border-radius: 50%;
-    background: var(--primary-color);
+    top: -12px;
+    left: calc(var(--card-w) * 0.14);
+    @include pixel-dot(6px, var(--primary-color));
     box-shadow: 0 0 6px var(--primary-color);
   }
 }
@@ -120,15 +185,16 @@ $card-sm: 53px;
 .cardHand {
   display: flex;
   flex-direction: row;
+  --overlap: -48px;
 
-  &.md > :not(:first-child) {
-    margin-left: var(--overlap, -48px);
+  > :not(:first-child) {
+    margin-left: var(--overlap);
     transition: margin-left 250ms $ease-out;
   }
 
   // face-down opponent hands; must match OPPONENT_OVERLAP in OpponentSeat
-  &.sm > :not(:first-child) {
-    margin-left: -42px;
+  &.sm {
+    --overlap: -42px;
   }
 }
 
@@ -138,10 +204,22 @@ $card-sm: 53px;
   position: fixed;
   inset: 0;
   overflow: hidden;
+
+  display: grid;
+  grid-template-columns: minmax(8.5rem, auto) minmax(0, 1fr) minmax(8.5rem, auto);
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  grid-template-areas:
+    ". top ."
+    "left table right"
+    "hand hand hand";
+  column-gap: 1.5rem;
+  row-gap: 1rem;
+  padding: 1rem 1.25rem 0.9rem;
+
   background:
     radial-gradient(
-      ellipse 55% 45% at 50% 48%,
-      rgba(63, 198, 121, 0.05),
+      ellipse 70% 60% at 50% 45%,
+      rgba(103, 138, 214, 0.07),
       transparent 70%
     ),
     var(--bg-color);
@@ -150,7 +228,7 @@ $card-sm: 53px;
 .settingsGearButton {
   position: fixed;
   top: 1rem;
-  right: 1rem;
+  right: 1.25rem;
   z-index: 6;
 
   display: grid;
@@ -158,18 +236,32 @@ $card-sm: 53px;
   width: 2.1rem;
   height: 2.1rem;
   border: 1px solid var(--border);
-  border-radius: 50%;
+  border-radius: $border-radius-md;
   background: var(--surface);
+  box-shadow: $bevel;
   color: var(--text-muted);
   transition:
     color 150ms ease,
     border-color 150ms ease,
-    transform 300ms $ease-out;
+    translate 120ms ease,
+    box-shadow 120ms ease;
+
+  svg {
+    transition: transform 400ms $ease-out;
+  }
 
   &:hover {
     color: var(--text-color);
     border-color: var(--border-strong);
-    transform: rotate(45deg);
+
+    svg {
+      transform: rotate(60deg);
+    }
+  }
+
+  &:active {
+    translate: 0 2px;
+    box-shadow: none;
   }
 }
 
@@ -178,65 +270,37 @@ $card-sm: 53px;
 .scoreboard {
   position: absolute;
   top: 1rem;
-  left: 1rem;
+  left: 1.25rem;
   z-index: 3;
-  width: 13.5rem;
-  padding: 0.85rem 1rem;
+  width: 20rem;
+  padding: 0.7rem 0.8rem 0.75rem;
 
   display: flex;
   flex-direction: column;
-  gap: 0.65rem;
+  gap: 0.6rem;
 
   border: 1px solid var(--border);
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.025);
+  border-radius: $border-radius-lg;
+  background: rgba(24, 28, 56, 0.72);
+  box-shadow: 0 3px 0 var(--bevel);
   backdrop-filter: blur(8px);
 
-  .teamRow {
-    display: grid;
-    grid-template-columns: auto 1fr auto;
-    align-items: center;
-    gap: 0.6rem;
-  }
-
-  .teamDot {
-    width: 7px;
-    height: 7px;
-    border-radius: 50%;
-    background: var(--border-strong);
-    transition: background 300ms ease;
-
-    &.on {
-      background: var(--primary-color);
-    }
-  }
-
-  .teamInfo {
-    display: flex;
-    flex-direction: column;
-    min-width: 0;
-  }
-
-  .teamName {
+  .scoreHeader {
     display: flex;
     align-items: center;
-    gap: 0.3rem;
-    font-size: 0.8rem;
-    font-weight: 500;
+    justify-content: space-between;
+    gap: 0.5rem;
   }
 
-  .onTag {
-    padding: 0 0.35rem;
-    border-radius: 999px;
-    background: var(--primary-soft);
-    color: var(--primary-color);
-    font-size: 0.62rem;
-    font-weight: 600;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
+  .trumpValue {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    perspective: 400px;
   }
 
-  .teamMembers {
+  .trumpCaption {
+    max-width: 7rem;
     overflow: hidden;
     color: var(--text-muted);
     font-size: 0.7rem;
@@ -244,25 +308,92 @@ $card-sm: 53px;
     text-overflow: ellipsis;
   }
 
-  .teamLevel {
-    font-size: 1.05rem;
-    font-weight: 600;
-    font-variant-numeric: tabular-nums;
+  .teams {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.4rem;
+  }
+
+  .teamCell {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    min-width: 0;
+    padding: 0.3rem 0.3rem 0.3rem 0.5rem;
+    border-radius: $border-radius-md;
+    border: 1px solid transparent;
+    background: rgba(4, 5, 16, 0.25);
+
+    &.mine {
+      border-color: var(--border);
+    }
+
+    .miniCard {
+      margin-left: auto;
+    }
+  }
+
+  .teamName {
+    overflow: hidden;
+    font-size: 0.76rem;
+    font-weight: 500;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+
+    .muted {
+      font-weight: 400;
+    }
+  }
+
+  .onTag {
+    flex-shrink: 0;
+    padding: 0.05rem 0.3rem;
+    border-radius: 3px;
+    background: var(--primary-soft);
+    color: var(--primary-color);
+    font-size: 0.6rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
   }
 
   .pointsRow {
     display: grid;
     grid-template-columns: 1fr auto;
-    align-items: baseline;
-    row-gap: 0.45rem;
+    align-items: center;
+    column-gap: 0.75rem;
     overflow: hidden;
-    font-size: 0.75rem;
+
+    .pointsTrack {
+      margin: 0;
+    }
   }
 
   .pointsValue {
-    font-size: 0.95rem;
-    font-weight: 600;
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0.3rem;
+    min-width: 3.4rem;
+    justify-content: flex-end;
+    @include pixel-font;
+    font-size: 1.25rem;
     font-variant-numeric: tabular-nums;
+  }
+
+  .pointsLabel {
+    color: var(--text-muted);
+    font-family: var(--font-main);
+    font-size: 0.66rem;
+    letter-spacing: 0;
+  }
+}
+
+// team markers are little square pixels, blue vs berry
+.teamMarker {
+  @include pixel-dot(8px, var(--team-a));
+
+  &.teamB {
+    background: var(--team-b);
   }
 }
 
@@ -270,15 +401,18 @@ $card-sm: 53px;
 .pointsTrack {
   grid-column: 1 / -1;
   position: relative;
-  height: 4px;
+  height: 6px;
   margin-bottom: 3px;
-  border-radius: 999px;
-  background: var(--surface-hover);
+  border-radius: 2px;
+  background: rgba(4, 5, 16, 0.45);
+  box-shadow: inset 0 1px 0 var(--bevel);
 
   .pointsFill {
     height: 100%;
     border-radius: inherit;
-    background: var(--primary-color);
+    background: var(--team-b);
+    // stepped highlight, like the shading on the sprites
+    box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.18);
   }
 
   .pointsThreshold {
@@ -286,39 +420,118 @@ $card-sm: 53px;
     top: -3px;
     bottom: -3px;
     left: 50%;
-    width: 1px;
+    width: 2px;
     background: var(--text-muted);
   }
 }
 
-// ---- opponents ----
+// ---- seats ----
+
+.seatPlate {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  height: 1.9rem;
+  padding: 0 0.6rem 0 0.55rem;
+
+  border: 1px solid var(--border);
+  border-radius: $border-radius-md;
+  background: var(--surface-raised);
+  box-shadow: $bevel;
+  font-size: 0.78rem;
+  white-space: nowrap;
+
+  transition:
+    border-color 250ms ease,
+    background 250ms ease,
+    box-shadow 250ms ease;
+
+  .seatName {
+    font-weight: 500;
+  }
+
+  .seatTag {
+    color: var(--text-muted);
+    font-size: 0.7rem;
+  }
+
+  .seatCount {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0.3rem;
+    min-width: 1.1rem;
+    margin-left: 0.1rem;
+    padding-left: 0.5rem;
+    border-left: 1px solid var(--border);
+    color: var(--text-muted);
+    @include pixel-font;
+    font-size: 1rem;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .seatCountLabel {
+    font-family: var(--font-main);
+    font-size: 0.7rem;
+    letter-spacing: 0;
+  }
+
+  &.activeTurn {
+    border-color: var(--primary-border);
+    background: #262338;
+    box-shadow:
+      $bevel,
+      0 0 0 3px var(--primary-soft);
+
+    .teamMarker {
+      animation: blink 1.1s steps(2, jump-none) infinite;
+    }
+
+    .seatCount {
+      color: var(--primary-color);
+    }
+  }
+}
+
+// a pixel cursor blink rather than a smooth pulse
+@keyframes blink {
+  0% {
+    background: var(--primary-color);
+  }
+  100% {
+    background: var(--primary-color);
+    opacity: 0.25;
+  }
+}
 
 .opponentSeat {
-  position: absolute;
   z-index: 2;
   display: flex;
   flex-direction: column;
   gap: 0.6rem;
 
   &.top {
-    top: 1rem;
-    left: 50%;
-    transform: translateX(-50%);
+    grid-area: top;
+    justify-self: center;
     align-items: center;
   }
 
   &.left {
-    top: 50%;
-    left: 1.25rem;
-    transform: translateY(-50%);
+    grid-area: left;
+    align-self: center;
+    justify-self: start;
     align-items: flex-start;
   }
 
   &.right {
-    top: 50%;
-    right: 1.25rem;
-    transform: translateY(-50%);
+    grid-area: right;
+    align-self: center;
+    justify-self: end;
     align-items: flex-end;
+  }
+
+  .topHand {
+    display: flex;
+    justify-content: center;
   }
 
   .sideHand {
@@ -337,59 +550,24 @@ $card-sm: 53px;
   }
 }
 
-.seatChip {
-  @include chip;
-  transition:
-    border-color 250ms ease,
-    background 250ms ease,
-    box-shadow 250ms ease;
-
-  .seatName {
-    font-weight: 500;
-  }
-
-  .seatCount {
-    color: var(--text-muted);
-    font-variant-numeric: tabular-nums;
-  }
-
-  &.activeTurn {
-    border-color: var(--primary-border);
-    background: var(--primary-soft);
-    animation: turnPulse 2.4s ease-in-out infinite;
-  }
-}
-
-@keyframes turnPulse {
-  0%,
-  100% {
-    box-shadow: 0 0 0 0 rgba(63, 198, 121, 0);
-  }
-  50% {
-    box-shadow: 0 0 0 5px rgba(63, 198, 121, 0.08);
-  }
-}
-
 // ---- your seat ----
 
 .actionBar {
-  position: absolute;
-  bottom: 0.9rem;
-  left: 50%;
+  grid-area: hand;
   z-index: 5;
-  transform: translateX(-50%);
-  // left: 50% would otherwise cap the shrink-to-fit width at half the
-  // screen and squash the hand
+  justify-self: center;
+  // the hand can be wider than the table column
   width: max-content;
+  max-width: 100%;
 
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 1.4rem;
+  gap: 1.1rem;
 
   .actionRow {
     width: 100%;
-    min-width: 36rem;
+    min-width: min(40rem, 100vw - 2.5rem);
     display: grid;
     grid-template-columns: 1fr auto 1fr;
     align-items: end;
@@ -398,30 +576,6 @@ $card-sm: 53px;
 
   .selfMeta {
     justify-self: start;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding-bottom: 0.45rem;
-    font-size: 0.78rem;
-
-    .selfName {
-      font-weight: 500;
-    }
-  }
-
-  .turnDot {
-    width: 7px;
-    height: 7px;
-    border-radius: 50%;
-    background: var(--border-strong);
-    transition:
-      background 250ms ease,
-      box-shadow 250ms ease;
-
-    &.active {
-      background: var(--primary-color);
-      box-shadow: 0 0 0 4px var(--primary-soft);
-    }
   }
 
   .actionCenter {
@@ -453,6 +607,7 @@ $card-sm: 53px;
 
   .actionButton {
     @include button;
+    min-width: 5.5rem;
 
     &:disabled {
       opacity: unset;
@@ -467,87 +622,117 @@ $card-sm: 53px;
     justify-self: end;
     display: flex;
     gap: 0.15rem;
-    padding-bottom: 0.3rem;
+    padding-bottom: 0.35rem;
   }
 
   .toggle {
     @include toggle;
   }
+
+  .myHand {
+    // room for the selection lift so cards don't clip
+    margin-top: 0.4rem;
+  }
 }
 
-// ---- table center ----
+// ---- table ----
 
-.tableCenter {
+.tableFelt {
+  grid-area: table;
+  position: relative;
+  justify-self: center;
+  width: min(100%, 64rem);
+  min-height: 0;
+
+  border: 1px solid rgba(173, 180, 196, 0.06);
+  border-radius: 44px;
+  background:
+    radial-gradient(
+      ellipse 60% 55% at 50% 50%,
+      var(--felt-light),
+      var(--felt) 75%
+    );
+  box-shadow:
+    inset 0 0 0 6px rgba(4, 5, 16, 0.18),
+    inset 0 2px 0 7px rgba(173, 180, 196, 0.03),
+    0 5px 0 var(--bevel),
+    0 30px 80px rgba(0, 0, 0, 0.35);
+
+  // faint pixel grid, just enough texture to read as felt
+  &::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background-image:
+      linear-gradient(rgba(255, 255, 255, 0.018) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255, 255, 255, 0.018) 1px, transparent 1px);
+    background-size: 8px 8px;
+    mask-image: radial-gradient(ellipse at center, #000 30%, transparent 75%);
+    pointer-events: none;
+  }
+}
+
+.tableMiddle {
   position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -58%);
-
+  inset: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
   gap: 1.1rem;
+  pointer-events: none;
 
-  .statusLine {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 0.55rem;
-  }
-
-  .statusText {
-    font-size: 1rem;
-    font-weight: 500;
-    letter-spacing: -0.005em;
-  }
-
-  .statusChips {
-    display: flex;
-    gap: 0.4rem;
+  > * {
+    pointer-events: auto;
   }
 }
 
-.tableSurface {
-  position: relative;
-  width: 30rem;
-  height: 17rem;
+.statusLine {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  min-height: 1.6rem;
 
-  .centered {
-    position: absolute;
-    inset: 0;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 0.75rem;
+  .statusText {
+    @include pixel-font;
+    font-size: 1.25rem;
+    white-space: nowrap;
   }
 
-  .bottomArea {
+  .turnPointer {
+    width: 14px;
+    height: 8px;
+    fill: var(--primary-color);
+    filter: drop-shadow(0 0 4px rgba(222, 167, 38, 0.45));
+  }
+}
+
+.phaseArea {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+
+  &.bottomArea {
     flex-direction: row;
+    align-items: flex-start;
     gap: 2rem;
   }
+}
 
-  .pileColumn {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 0.75rem;
-  }
+.pileColumn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
 }
 
 .pile {
+  @include card-size-vars;
   position: relative;
-  width: $card-md;
-  height: calc(1.5 * 75px);
-
-  &.small {
-    width: $card-sm;
-    height: 75px;
-
-    .pileCard img {
-      width: $card-sm;
-    }
-  }
+  width: var(--card-w);
+  height: var(--card-h);
 
   &.clickable {
     cursor: pointer;
@@ -556,38 +741,39 @@ $card-sm: 53px;
   .pileCard {
     position: absolute;
     top: calc(var(--i) * -2px);
-    left: calc(var(--i) * 1.5px);
+    left: calc(var(--i) * 2px);
 
     img {
-      width: $card-md;
+      width: var(--card-w);
       max-width: none;
       image-rendering: pixelated;
+      filter: drop-shadow(0 2px 0 var(--bevel));
     }
   }
 
   .pileGlow {
     position: absolute;
-    inset: -8px -6px -6px -8px;
-    border-radius: 12px;
-    box-shadow: 0 0 0 1px var(--primary-border);
-    animation: pileGlow 1.8s ease-in-out infinite;
+    inset: -12px -6px -6px -10px;
+    border: 2px solid var(--primary-color);
+    border-radius: 10px;
+    animation: pileGlow 1.6s steps(4, jump-none) infinite alternate;
     pointer-events: none;
   }
 }
 
 @keyframes pileGlow {
-  0%,
-  100% {
-    opacity: 0.35;
+  from {
+    opacity: 0.15;
   }
-  50% {
-    opacity: 1;
+  to {
+    opacity: 0.8;
   }
 }
 
 .pileLabel {
   color: var(--text-muted);
-  font-size: 0.72rem;
+  @include pixel-font;
+  font-size: 1rem;
   font-variant-numeric: tabular-nums;
 }
 
@@ -604,67 +790,74 @@ $card-sm: 53px;
     left: 0;
 
     img {
-      width: $card-sm;
+      width: $card-w;
       max-width: none;
       image-rendering: pixelated;
+      filter: drop-shadow(-1px 0 0 rgba(4, 5, 16, 0.25));
     }
   }
 }
 
 // each player's play sits on their side of the table, cards upright
 .trickGroup {
+  @include card-size-vars;
   position: absolute;
-  display: flex;
+  z-index: 2;
 
-  > :not(:first-child) {
-    margin-left: -34px;
+  .trickCards {
+    display: flex;
+
+    > :not(:first-child) {
+      margin-left: calc(var(--card-w) * -0.62);
+    }
   }
 
   &.bottom {
-    bottom: 0;
-    left: 0;
-    right: 0;
-    justify-content: center;
+    bottom: 1.1rem;
+    left: 50%;
+    translate: -50% 0;
   }
 
   &.top {
-    top: 0;
-    left: 0;
-    right: 0;
-    justify-content: center;
+    top: 1.1rem;
+    left: 50%;
+    translate: -50% 0;
   }
 
   &.left {
-    top: 0;
-    bottom: 0;
-    left: 0;
-    align-items: center;
+    top: 50%;
+    left: 1.75rem;
+    translate: 0 -50%;
   }
 
   &.right {
-    top: 0;
-    bottom: 0;
-    right: 0;
-    align-items: center;
+    top: 50%;
+    right: 1.75rem;
+    translate: 0 -50%;
   }
 
   &.won .cardImage {
-    filter: drop-shadow(0 0 4px rgba(63, 198, 121, 0.75));
+    filter: drop-shadow(2px 0 0 var(--primary-color))
+      drop-shadow(-2px 0 0 var(--primary-color))
+      drop-shadow(0 2px 0 var(--primary-color))
+      drop-shadow(0 -2px 0 var(--primary-color));
   }
 }
 
 .trickPoints {
   position: absolute;
-  top: 50%;
+  top: calc(50% + 2rem);
   left: 50%;
-  translate: -50% -50%;
-  padding: 0.25rem 0.65rem;
-  border: 1px solid var(--primary-border);
-  border-radius: 999px;
-  background: var(--primary-soft);
-  color: var(--primary-color);
-  font-size: 0.8rem;
-  font-weight: 600;
+  z-index: 3;
+  translate: -50% 0;
+  padding: 0.2rem 0.6rem;
+  border: 1px solid rgba(201, 103, 125, 0.5);
+  border-radius: $border-radius-sm;
+  background: #2b1d33;
+  box-shadow: $bevel;
+  color: var(--team-b);
+  @include pixel-font;
+  font-size: 1rem;
 }
 
 // ---- overlays: round summary + settings ----
@@ -679,13 +872,19 @@ $card-sm: 53px;
   justify-content: center;
   padding: 16px;
 
-  background: rgba(8, 9, 10, 0.55);
+  background: rgba(6, 7, 18, 0.6);
   backdrop-filter: blur(6px);
+}
+
+.panelTitle {
+  @include pixel-font;
+  font-size: 2rem;
+  line-height: 1.1;
 }
 
 .summaryPanel {
   @include panel;
-  width: min(26rem, 100%);
+  width: min(27rem, 100%);
   padding: 1.6rem 1.75rem;
 
   display: flex;
@@ -694,9 +893,6 @@ $card-sm: 53px;
 
   .summaryTitle {
     margin-top: -0.6rem;
-    font-size: 1.3rem;
-    font-weight: 600;
-    letter-spacing: -0.01em;
   }
 
   .summaryPoints {
@@ -713,8 +909,8 @@ $card-sm: 53px;
   }
 
   .summaryPointsValue {
-    font-size: 2.2rem;
-    font-weight: 600;
+    @include pixel-font;
+    font-size: 3rem;
     line-height: 1;
     font-variant-numeric: tabular-nums;
   }
@@ -722,7 +918,7 @@ $card-sm: 53px;
   .summaryBottom {
     display: flex;
     flex-direction: column;
-    gap: 0.5rem;
+    gap: 0.6rem;
     font-size: 0.78rem;
   }
 
@@ -730,7 +926,7 @@ $card-sm: 53px;
     display: flex;
 
     > :not(:first-child) {
-      margin-left: -24px;
+      margin-left: -22px;
     }
   }
 
@@ -765,13 +961,7 @@ $card-sm: 53px;
   .settingsTitle {
     display: flex;
     flex-direction: column;
-    gap: 0.2rem;
-
-    h2 {
-      font-size: 1.3rem;
-      font-weight: 600;
-      letter-spacing: -0.01em;
-    }
+    gap: 0.3rem;
   }
 
   .settingsHeaderRight {
@@ -783,15 +973,27 @@ $card-sm: 53px;
   .roomCode {
     @include chip;
     gap: 0.5rem;
-    transition: border-color 150ms ease;
+    height: 2rem;
+    box-shadow: $bevel;
+    transition:
+      border-color 150ms ease,
+      translate 120ms ease,
+      box-shadow 120ms ease;
 
     &:hover {
       border-color: var(--border-strong);
     }
 
+    &:active {
+      translate: 0 2px;
+      box-shadow: none;
+    }
+
     .roomCodeValue {
-      font-weight: 600;
-      letter-spacing: 0.12em;
+      @include pixel-font;
+      font-size: 1rem;
+      letter-spacing: 0.14em;
+      color: var(--primary-color);
     }
   }
 
@@ -828,7 +1030,7 @@ $card-sm: 53px;
   .playerList {
     display: flex;
     flex-direction: column;
-    gap: 0.35rem;
+    gap: 0.4rem;
   }
 
   .playerRow,
@@ -844,6 +1046,7 @@ $card-sm: 53px;
   .playerRow {
     border: 1px solid var(--border);
     background: var(--surface);
+    box-shadow: $bevel;
 
     &.me {
       border-color: var(--border-strong);
@@ -851,19 +1054,14 @@ $card-sm: 53px;
   }
 
   .emptySeat {
-    border: 1px dashed var(--border);
+    border: 1px dashed var(--border-strong);
     color: var(--text-muted);
     font-size: 0.78rem;
-  }
 
-  .teamSwatch {
-    width: 7px;
-    height: 7px;
-    border-radius: 50%;
-    background: var(--primary-color);
-
-    &.alt {
-      background: var(--text-muted);
+    &::before {
+      content: "";
+      @include pixel-dot(8px, var(--border-strong));
+      animation: blink 1.1s steps(2, jump-none) infinite;
     }
   }
 
@@ -881,8 +1079,8 @@ $card-sm: 53px;
   }
 
   .tag {
-    padding: 0.05rem 0.45rem;
-    border-radius: 999px;
+    padding: 0.05rem 0.4rem;
+    border-radius: 3px;
     background: var(--surface-hover);
     color: var(--text-muted);
     font-size: 0.66rem;
@@ -899,20 +1097,12 @@ $card-sm: 53px;
     margin-top: 0.4rem;
 
     input {
+      @include text-input;
       flex: 1;
       width: auto;
       min-width: 0;
       height: 2.1rem;
-      padding: 0 0.9rem;
-      border: 1px solid var(--border);
-      border-radius: 999px;
-      background: var(--surface);
       font-size: 0.82rem;
-      transition: border-color 150ms ease;
-
-      &:focus {
-        border-color: var(--primary-border);
-      }
     }
   }
 
@@ -931,7 +1121,8 @@ $card-sm: 53px;
     .mustPlayLevel {
       width: 1.5rem;
       color: var(--text-muted);
-      font-weight: 600;
+      @include pixel-font;
+      font-size: 1rem;
       font-variant-numeric: tabular-nums;
     }
   }
@@ -940,11 +1131,12 @@ $card-sm: 53px;
     display: inline-flex;
     padding: 2px;
     border: 1px solid var(--border);
-    border-radius: 999px;
+    border-radius: $border-radius-sm + 2px;
+    background: rgba(4, 5, 16, 0.3);
 
     .segment {
       padding: 0.15rem 0.65rem;
-      border-radius: 999px;
+      border-radius: $border-radius-sm;
       color: var(--text-muted);
       font-size: 0.72rem;
       transition:
@@ -957,6 +1149,7 @@ $card-sm: 53px;
 
       &.active {
         background: var(--surface-hover);
+        box-shadow: 0 1px 0 var(--bevel);
         color: var(--text-color);
       }
 

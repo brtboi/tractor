@@ -15,12 +15,14 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.35rem;
+  gap: 0.4rem;
 
   .title {
-    font-size: 2.2rem;
-    font-weight: 700;
-    letter-spacing: -0.02em;
+    @include pixel-font;
+    font-size: 3rem;
+    line-height: 1;
+    letter-spacing: 0.04em;
+    text-shadow: 0 3px 0 var(--bevel);
   }
 
   .description {
@@ -29,22 +31,23 @@
   }
 }
 
-@mixin text-input {
+// a little hand of cards fanned out above the title
+.fan {
+  position: relative;
   width: 100%;
-  height: 2.5rem;
-  padding: 0 1rem;
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  background: var(--surface);
-  font-size: 0.9rem;
-  transition: border-color 150ms ease;
+  height: 7.5rem;
+  margin-bottom: 0.6rem;
 
-  &::placeholder {
-    color: var(--text-muted);
-  }
-
-  &:focus {
-    border-color: var(--primary-border);
+  .fanCard {
+    position: absolute;
+    left: 50%;
+    bottom: 0;
+    width: 79.5px;
+    max-width: none;
+    margin-left: -39.75px;
+    image-rendering: pixelated;
+    transform-origin: 50% 120%;
+    filter: drop-shadow(0 3px 0 var(--bevel));
   }
 }
 
@@ -58,6 +61,7 @@
 
   input {
     @include text-input;
+    width: 100%;
   }
 }
 
@@ -76,7 +80,6 @@
   @include button-primary;
   width: 100%;
   height: 2.5rem;
-  font-size: 0.9rem;
 }
 
 .divider {
@@ -102,10 +105,14 @@
   input {
     flex: 1;
     min-width: 0;
-    letter-spacing: 0.08em;
+    @include pixel-font;
+    font-size: 1rem;
+    letter-spacing: 0.14em;
     text-transform: uppercase;
 
     &::placeholder {
+      font-family: var(--font-main);
+      font-size: 0.9rem;
       letter-spacing: normal;
       text-transform: none;
     }
@@ -116,5 +123,4 @@
   @include button;
   height: 2.5rem;
   padding: 0 1.25rem;
-  font-size: 0.9rem;
 }

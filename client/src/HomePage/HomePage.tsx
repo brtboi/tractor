@@ -7,6 +7,8 @@ import { useNavigate } from "react-router-dom";
 
 const NAME_KEY = "PLAYER_NAME";
 
+const FAN_CARDS = ["Spades_02", "Hearts_14", "Joker_16", "Joker_15", "Diamonds_02"];
+
 function loadName(): string {
   try {
     return localStorage.getItem(NAME_KEY) ?? "";
@@ -65,7 +67,35 @@ export default function HomePage() {
       transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
     >
       <div className={styles.titleDiv}>
-        <h1 className={styles.title}>🚜 Tractor</h1>
+        <div className={styles.fan} aria-hidden="true">
+          {FAN_CARDS.map((sprite, i) => {
+            const offset = i - (FAN_CARDS.length - 1) / 2;
+            return (
+              <motion.img
+                key={sprite}
+                className={styles.fanCard}
+                src={`/cardSprites/${sprite}.png`}
+                alt=""
+                draggable={false}
+                initial={{ opacity: 0, y: 30, rotate: 0, x: 0 }}
+                animate={{
+                  opacity: 1,
+                  y: Math.abs(offset) * 6,
+                  rotate: offset * 9,
+                  x: offset * 34,
+                }}
+                whileHover={{ y: Math.abs(offset) * 6 - 10 }}
+                transition={{
+                  type: "spring",
+                  stiffness: 260,
+                  damping: 22,
+                  delay: 0.15 + i * 0.06,
+                }}
+              />
+            );
+          })}
+        </div>
+        <h1 className={styles.title}>Tractor</h1>
         <p className={styles.description}>hi :P WIP</p>
       </div>
 

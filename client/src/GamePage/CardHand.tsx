@@ -3,6 +3,7 @@ import { clsx } from "clsx";
 import type { Card } from "@tractor/shared";
 import CardComponent, { type CardSize } from "./CardComponent";
 import { cardKey, isCardSelected, type Orientation } from "./GamePageHelpers";
+import type { FlyFrom } from "./useFlyIn";
 import styles from "./GamePage.module.scss";
 
 type BaseProps = {
@@ -12,6 +13,8 @@ type BaseProps = {
   // px each card overlaps the previous one (negative margin); falls back to
   // the stylesheet default
   overlap?: number;
+  // cards dealt into the hand after it first renders glide in from here
+  flyFrom?: FlyFrom;
 };
 
 type Props =
@@ -28,7 +31,14 @@ type Props =
     });
 
 export default function CardHand(props: Props) {
-  const { orientation, isSelectable, cards, size = "md", overlap } = props;
+  const {
+    orientation,
+    isSelectable,
+    cards,
+    size = "md",
+    overlap,
+    flyFrom,
+  } = props;
 
   return (
     <div
@@ -50,6 +60,7 @@ export default function CardHand(props: Props) {
               orientation={orientation}
               isSelected={false}
               size={size}
+              flyFrom={flyFrom}
             />
           ) : (
             <CardComponent
@@ -58,6 +69,7 @@ export default function CardHand(props: Props) {
               isFaceDown={false}
               orientation={orientation}
               size={size}
+              flyFrom={flyFrom}
               isSelectable={isSelectable}
               isSelected={
                 isSelectable

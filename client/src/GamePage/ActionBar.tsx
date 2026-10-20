@@ -1,9 +1,10 @@
-import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { clsx } from "clsx";
 import type { Card } from "@tractor/shared";
 import CardHand from "./CardHand";
-import { CARD_WIDTH } from "./GamePageHelpers";
+import SeatPlate from "./SeatPlate";
+import { CARD_HEIGHT, CARD_SCALE, CARD_WIDTH } from "./GamePageHelpers";
+import { useBoardCardSize, useViewportWidth } from "./useViewport";
 import styles from "./GamePage.module.scss";
 
 export type ActionDescriptor = {
@@ -16,6 +17,7 @@ export type ActionDescriptor = {
 
 type Props = {
   name: string;
+  team: number;
   isMyTurn: boolean;
   cards: Card[];
   selectedCards: Card[];
@@ -29,22 +31,13 @@ type Props = {
   hint: string | null;
 };
 
-const HAND_CARD_WIDTH = CARD_WIDTH * 1.5;
-const MAX_VISIBLE = 31.5; // px of each card showing at the default overlap
-const MIN_VISIBLE = 16; // enough to still read the corner index
-
-function useViewportWidth(): number {
-  const [width, setWidth] = useState(() => window.innerWidth);
-  useEffect(() => {
-    const onResize = () => setWidth(window.innerWidth);
-    window.addEventListener("resize", onResize);
-    return () => window.removeEventListener("resize", onResize);
-  }, []);
-  return width;
-}
+// px of each card showing, as a fraction of the card's width
+const MAX_VISIBLE = 0.4;
+const MIN_VISIBLE = 0.2; // enough to still read the corner index
 
 export default function ActionBar({
   name,
+  team,
   isMyTurn,
   cards,
   selectedCards,
@@ -56,31 +49,37 @@ export default function ActionBar({
   actions,
   hint,
 }: Props) {
+  const size = useBoardCardSize();
+  const cardWidth = CARD_WIDTH * CARD_SCALE[size];
+
   // squeeze the fan on narrow screens (and for the 33-card bury hand)
   // rather than letting it run off the edges
   const viewportWidth = useViewportWidth();
   const visiblePerCard =
     cards.length > 1
       ? Math.min(
-          MAX_VISIBLE,
+          MAX_VISIBLE * cardWidth,
           Math.max(
-            MIN_VISIBLE,
-            (viewportWidth - 48 - HAND_CARD_WIDTH) / (cards.length - 1),
+            MIN_VISIBLE * cardWidth,
+            (viewportWidth - 48 - cardWidth) / (cards.length - 1),
           ),
         )
-      : MAX_VISIBLE;
+      : cardWidth;
+
+  const selectedCount = selectedCards.length;
 
   return (
     <div className={styles.actionBar}>
       <div className={styles.actionRow}>
         <div className={styles.selfMeta}>
-          <span className={clsx(styles.turnDot, isMyTurn && styles.active)} />
-          <span className={styles.selfName}>{name}</span>
-          <span className={styles.muted}>
-            {selectedCards.length > 0
-              ? `${selectedCards.length} selected`
-              : `${cards.length} card${cards.length === 1 ? "" : "s"}`}
-          </span>
+          <SeatPlate
+            name={name}
+            team={team}
+            isTurn={isMyTurn}
+            tag="you"
+            count={selectedCount > 0 ? selectedCount : cards.length}
+            countLabel={selectedCount > 0 ? "selected" : undefined}
+          />
         </div>
 
         <div className={styles.actionCenter}>
@@ -112,7 +111,6 @@ export default function ActionBar({
                   animate={{ opacity: action.disabled ? 0.35 : 1, y: 0 }}
                   exit={{ opacity: 0, y: 8 }}
                   transition={{ type: "spring", stiffness: 420, damping: 36 }}
-                  whileTap={action.disabled ? undefined : { scale: 0.96 }}
                   disabled={action.disabled}
                   onClick={action.onClick}
                   className={clsx(
@@ -147,16 +145,26 @@ export default function ActionBar({
         </div>
       </div>
 
-      <CardHand
-        cards={cards}
-        isFaceDown={false}
-        orientation="bottom"
-        isSelectable={true}
-        selectedCards={selectedCards}
-        highlightedCards={highlightedCards}
-        onCardClick={onCardClick}
-        overlap={visiblePerCard - HAND_CARD_WIDTH}
-      />
+      <div
+        className={styles.myHand}
+        data-fly-origin="seat-me"
+        // hold the hand's height even when empty so the table doesn't
+        // jump around between rounds
+        style={{ minHeight: CARD_HEIGHT * CARD_SCALE[size] }}
+      >
+        <CardHand
+          cards={cards}
+          isFaceDown={false}
+          orientation="bottom"
+          isSelectable={true}
+          selectedCards={selectedCards}
+          highlightedCards={highlightedCards}
+          onCardClick={onCardClick}
+          size={size}
+          overlap={visiblePerCard - cardWidth}
+          flyFrom={{ origin: "pile" }}
+        />
+      </div>
     </div>
   );
 }

@@ -64,7 +64,7 @@ function ToastItem({
           }}
           aria-label="Dismiss error"
         >
-          x
+          ✕
         </button>
       </div>
       <div className={styles.progressTrack}>
