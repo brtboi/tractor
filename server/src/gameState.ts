@@ -712,14 +712,15 @@ export function overturnTrump(
     draftRound.callCards = cards;
     draftRound.callPlayer = playerId;
 
-    if (round.phase === "asking_before_bottoming") {
-      // nobody called while drawing, so the bottom hasn't been taken yet.
-      // first round: this is the first call, so the caller goes on.
-      // after that the bottom stays with whoever's on by rotation.
-      if (draft.currentRoundNumber === 0) {
-        draftRound.onTeam = getTeam(playerId, draft.teams);
-        draftRound.onPlayer = playerId;
-      }
+    if (draft.currentRoundNumber === 0) {
+      // first round: whoever calls/overturns last is on, takes the bottom
+      // and leads
+      draftRound.onTeam = getTeam(playerId, draft.teams);
+      draftRound.onPlayer = playerId;
+      draftRound.bottomPlayer = playerId;
+    } else if (round.phase === "asking_before_bottoming") {
+      // nobody called while drawing, so the bottom hasn't been taken yet;
+      // it stays with whoever's on by rotation
       draftRound.bottomPlayer = draftRound.onPlayer;
     } else {
       // overturning after the bottom was buried: the overturner re-buries
