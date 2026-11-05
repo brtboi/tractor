@@ -528,14 +528,10 @@ export function drawCard(prev: GameState, playerId: string): GameState {
       round.drawPile = [];
 
       // ask around to call if nobody has called yet
+      // (in the first round, the first call already set who's on)
       if (round.callPlayer === null) {
         round.phase = "asking_before_bottoming";
         round.currentTurn = round.onPlayer;
-      } else if (draft.currentRoundNumber === 0) {
-        // set on/off team if first round based off of who called
-        round.onTeam = getTeam(round.callPlayer, draft.teams);
-        round.onPlayer = round.callPlayer;
-        round.bottomPlayer = round.callPlayer;
       }
     } else {
       round.phase = "drawing";
@@ -608,6 +604,13 @@ export function callTrump(
 
   return produce(prev, (draft) => {
     const round = draft.currentRound!;
+    // first round only: whoever calls first is on and takes the bottom,
+    // even if someone overcalls them later
+    if (draft.currentRoundNumber === 0 && round.callPlayer === null) {
+      round.onTeam = getTeam(playerId, draft.teams);
+      round.onPlayer = playerId;
+      round.bottomPlayer = playerId;
+    }
     round.callCards = cards;
     round.callPlayer = playerId;
     round.trumpSuit = cards[0].suit;
