@@ -736,11 +736,13 @@ function getNextRound(
   let currentScore: number;
   let nextScore: number;
 
-  // onTeam proceed
+  // onTeam proceed: 0 -> +3, 5-35 -> +2, 40-75 -> +1
   if (totalPoints < 80) {
     currentScore = draft.teams[onTeam].score;
     draft.teams[onTeam].hasPlayed[currentScore] = 2;
-    nextScore = currentScore + Math.floor((119 - totalPoints) / 40);
+    nextScore =
+      currentScore +
+      (totalPoints === 0 ? 3 : Math.floor((119 - totalPoints) / 40));
   }
 
   // offTeam proceed
