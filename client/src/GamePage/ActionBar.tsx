@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { clsx } from "clsx";
 import type { Card } from "@tractor/shared";
@@ -28,6 +29,8 @@ type Props = {
   // only shown while drawing
   autoDraw: { enabled: boolean; onToggle: () => void } | null;
   actions: ActionDescriptor[];
+  // enter triggers the primary action
+  enterKeyEnabled: boolean;
   hint: string | null;
 };
 
@@ -47,8 +50,24 @@ export default function ActionBar({
   onToggleSort,
   autoDraw,
   actions,
+  enterKeyEnabled,
   hint,
 }: Props) {
+  useEffect(() => {
+    if (!enterKeyEnabled) return;
+    const primary = actions.find((a) => a.primary && !a.disabled);
+    if (!primary) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== "Enter" || e.repeat) return;
+      const target = e.target as HTMLElement | null;
+      if (target?.closest("input, textarea, button")) return;
+      e.preventDefault();
+      primary.onClick();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [actions, enterKeyEnabled]);
+
   const size = useBoardCardSize();
   const cardWidth = CARD_WIDTH * CARD_SCALE[size];
 

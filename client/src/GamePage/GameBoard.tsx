@@ -91,24 +91,6 @@ export default function GameBoard({ isInteractive }: Props) {
   }
   const clearSelection = () => setSelectedCards([]);
 
-  const primaryAction = () =>
-    actions.find((a) => a.primary && !a.disabled) ?? null;
-
-  useEffect(() => {
-    if (!isInteractive) return;
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key !== "Enter" || e.repeat) return;
-      const target = e.target as HTMLElement | null;
-      if (target?.closest("input, textarea, button")) return;
-      const action = primaryAction();
-      if (!action) return;
-      e.preventDefault();
-      action.onClick();
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  });
-
   if (!gameState || !currentRound) {
     return <p>no game state :(</p>;
   }
@@ -317,6 +299,7 @@ export default function GameBoard({ isInteractive }: Props) {
             : null
         }
         actions={actions}
+        enterKeyEnabled={isInteractive}
         hint={hint}
       />
     </div>
