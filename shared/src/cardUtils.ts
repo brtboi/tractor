@@ -158,15 +158,24 @@ function getTrickSuit(
 
 /**
  * From card[] to array of (number of cards, rank) for each set of consecutive pairs.
- * Assumes trick is sorted by canonical rank.
+ * Sorts the trick itself, so any card order works.
  * @example [22 33 44 77 A] -> [{numCards: 6, highestRank: 4}, {numCards: 2, highestRank: 7}, {numCards: 1, highestRank: 14}]
  */
 function getTrickSequence(
-  trick: Card[],
+  unsortedTrick: Card[],
   trumpSuit: Suit,
   trumpRank: number,
 ): TrickSequence {
-  if (!getTrickSuit(trick, trumpSuit, trumpRank)) return [];
+  if (!getTrickSuit(unsortedTrick, trumpSuit, trumpRank)) return [];
+
+  // tricks arrive in whatever order the cards were selected; sort by
+  // canonical rank (then suit, so identical cards sit next to each other)
+  const trick = [...unsortedTrick].sort(
+    (a, b) =>
+      getCanonicalRank(a, trumpSuit, trumpRank) -
+        getCanonicalRank(b, trumpSuit, trumpRank) ||
+      a.suit.localeCompare(b.suit),
+  );
 
   const degreeSequence: TrickSequence = [];
   let i = 0;
@@ -186,7 +195,8 @@ function getTrickSequence(
     } else {
       let numConsecutivePairs = 1;
       while (
-        i + 2 * numConsecutivePairs < trick.length &&
+        // need both cards of the next pair, not just the first
+        i + 2 * numConsecutivePairs + 1 < trick.length &&
         getCanonicalRank(
           trick[i + 2 * numConsecutivePairs],
           trumpSuit,
