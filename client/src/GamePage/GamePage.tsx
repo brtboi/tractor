@@ -31,27 +31,13 @@ export default function GamePage() {
     !!gameState &&
     gameState.roomId === roomCode &&
     !!gameState.players[playerId];
-  const otherRoomId =
-    gameState && gameState.roomId !== roomCode ? gameState.roomId : null;
   const failure = joinFailure?.roomCode === roomCode ? joinFailure : null;
 
-  // remember once we've been seated here, so losing the room afterwards
-  // (leaving, getting removed) doesn't count as "opened a link to it"
-  const [seatedIn, setSeatedIn] = useState<string | null>(null);
-  if (isInThisRoom && seatedIn !== roomCode) setSeatedIn(roomCode);
-  const hasBeenSeated = seatedIn === roomCode;
-
-  // opened a room link directly (or refreshed): join it. if we're already
-  // seated there the server just hands our seat back.
+  // arriving at a room's url (link, refresh, reconnect) means "put me in
+  // this room". joining is idempotent: if we already have a seat the server
+  // just hands it back, and it refuses if we're seated in a different room.
   useEffect(() => {
-    if (
-      !isRegistered ||
-      isInThisRoom ||
-      hasBeenSeated ||
-      otherRoomId ||
-      !roomCode
-    )
-      return;
+    if (!isRegistered || !roomCode) return;
     let cancelled = false;
     joinRoom(roomCode, loadName()).then((res) => {
       if (!cancelled && !res.ok)
@@ -60,7 +46,34 @@ export default function GamePage() {
     return () => {
       cancelled = true;
     };
-  }, [isRegistered, isInThisRoom, hasBeenSeated, otherRoomId, roomCode]);
+  }, [isRegistered, roomCode]);
+
+  if (failure?.code === "ALREADY_IN_ROOM") {
+    const myRoomId = gameState?.roomId;
+    return (
+      <NotFound
+        title={
+          myRoomId ? (
+            <>
+              you're already in room{" "}
+              <span className={notFoundStyles.code}>{myRoomId}</span>
+            </>
+          ) : (
+            "you're already in another room"
+          )
+        }
+        message="Leave it first if you want to join a different one."
+        action={
+          myRoomId
+            ? {
+                label: "Back to my room",
+                onClick: () => navigate(`/game/${myRoomId}`, { replace: true }),
+              }
+            : undefined
+        }
+      />
+    );
+  }
 
   if (failure) {
     const code = <span className={notFoundStyles.code}>{roomCode}</span>;
@@ -85,27 +98,7 @@ export default function GamePage() {
     );
   }
 
-  if (otherRoomId) {
-    return (
-      <NotFound
-        title={
-          <>
-            you're already in room{" "}
-            <span className={notFoundStyles.code}>{otherRoomId}</span>
-          </>
-        }
-        message="Leave it first if you want to join a different one."
-        action={{
-          label: "Back to my room",
-          onClick: () => navigate(`/game/${otherRoomId}`, { replace: true }),
-        }}
-      />
-    );
-  }
-
   if (!gameState || !isInThisRoom) {
-    // just left: we're on our way home, nothing to show
-    if (hasBeenSeated) return null;
     return <p className={styles.joining}>joining {roomCode}…</p>;
   }
 

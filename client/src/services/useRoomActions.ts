@@ -1,4 +1,4 @@
-import { useCallback } from "react";
+import { startTransition, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import type { AckResult, Card, GameSettings } from "@tractor/shared";
 import { useGameSocket } from "./useGameSocket";
@@ -56,8 +56,13 @@ export function useRoomActions() {
       // leaving needs to work even if the server can't confirm it (stale
       // room, dropped connection) - clear local state regardless of the ack
       const res = await run(leaveRoom(roomId));
-      resetGameState();
-      navigate("/");
+      // the router navigates inside a transition; clearing the room in the
+      // same transition makes both land in one render, so the room page
+      // never sees itself without a room on the way out
+      startTransition(() => {
+        navigate("/");
+        resetGameState();
+      });
       return res;
     },
 
