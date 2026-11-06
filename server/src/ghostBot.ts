@@ -147,8 +147,15 @@ export function getGhostMove(state: GameState): GhostMove | null {
         round.trumpSuit,
         round.trumpRank,
       );
-      // pause a bit longer after a trick completes so people can see it
-      const delayMs = round.currentTricks.length === 0 ? 1400 : 800;
+      // pause a bit longer after a trick completes so people can see it,
+      // and longer still while a throw is being announced
+      const isThrowAnnounced =
+        !!round.lastThrow && round.currentTricks.length === 1;
+      const delayMs = isThrowAnnounced
+        ? 2600
+        : round.currentTricks.length === 0
+          ? 1400
+          : 800;
       return {
         delayMs,
         apply: (s) => playTrick(s, round.currentTurn, trick),

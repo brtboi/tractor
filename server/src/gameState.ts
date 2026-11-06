@@ -15,6 +15,10 @@ import {
   isCardSame,
   getPlayError,
   Team,
+  ThrowAttempt,
+  checkThrow,
+  isThrow,
+  isThrowGuaranteed,
 } from "@tractor/shared";
 
 // TODO: check ServerError types lowk
@@ -166,6 +170,8 @@ function replaceSeat(
     round.currentTricks = round.currentTricks.map((t) =>
       t.playerId === oldId ? { ...t, playerId: newId } : t,
     );
+    if (round.lastThrow?.playerId === oldId) round.lastThrow.playerId = newId;
+    if (round.lastThrow?.beatenBy === oldId) round.lastThrow.beatenBy = newId;
   }
 }
 
@@ -377,6 +383,7 @@ function newRound(
     currentTricks: [],
     lastTrick: [],
     lastTrickWinner: null,
+    lastThrow: null,
 
     drawPile: shuffleCards(2),
     hands: playerOrder.reduce((acc, id) => ({ ...acc, [id]: [] }), {}),
@@ -820,10 +827,53 @@ export function nextRound(prev: GameState, playerId: string): GameState {
   });
 }
 
+/**
+ * "Can I play this": a lead that isn't a single, pair or tractor gets
+ * checked against everyone else's hands. If anyone (teammate included)
+ * could beat part of it, only that part is played. Returns null for plain
+ * leads and for throws that can't possibly be beaten.
+ */
+function resolveThrow(
+  state: GameState,
+  playerId: string,
+  attempted: Card[],
+): ThrowAttempt | null {
+  const round = state.currentRound!;
+  const trumpSuit = round.trumpSuit!;
+  if (!isThrow(attempted, trumpSuit, round.trumpRank)) return null;
+
+  // what the thrower can see for sure: their hand, everything played so
+  // far, and the bottom if they buried it
+  const known = [
+    ...round.hands[playerId],
+    ...Object.values(round.discards).flat(2),
+    ...round.points,
+    ...(round.bottomPlayer === playerId ? round.bottom : []),
+  ];
+  if (isThrowGuaranteed(attempted, known, trumpSuit, round.trumpRank))
+    return null;
+
+  const others: { playerId: string; hand: Card[] }[] = [];
+  for (
+    let id = getNextTurn(state.playerOrder, playerId);
+    id !== playerId;
+    id = getNextTurn(state.playerOrder, id)
+  )
+    others.push({ playerId: id, hand: round.hands[id] });
+
+  const check = checkThrow(attempted, others, trumpSuit, round.trumpRank);
+  return {
+    playerId,
+    attempted,
+    played: check?.forced ?? attempted,
+    beatenBy: check?.beatenBy ?? null,
+  };
+}
+
 export function playTrick(
   prev: GameState,
   playerId: string,
-  trick: Card[],
+  attempted: Card[],
 ): GameState {
   const prevRound = requireRound(prev, "playing");
   requireTurn(prevRound, playerId);
@@ -832,7 +882,7 @@ export function playTrick(
     throw new ServerError("INVALID_TRICK", "Trump not set");
 
   const playError = getPlayError(
-    trick,
+    attempted,
     prevRound.hands[playerId],
     prevRound.currentTricks[0]?.trick ?? null,
     prevRound.trumpSuit,
@@ -840,8 +890,13 @@ export function playTrick(
   );
   if (playError) throw new ServerError("INVALID_TRICK", playError);
 
+  const isLead = prevRound.currentTricks.length === 0;
+  const throwAttempt = isLead ? resolveThrow(prev, playerId, attempted) : null;
+  const trick = throwAttempt?.played ?? attempted;
+
   return produce(prev, (draft) => {
     const round = draft.currentRound!;
+    if (isLead) round.lastThrow = throwAttempt;
 
     round.currentTricks.push({ playerId, trick });
     round.hands[playerId] = round.hands[playerId].filter(
