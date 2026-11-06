@@ -161,6 +161,18 @@ io.on("connection", (socket) => {
     try {
       const playerId = getPlayerId(socket);
       if (!rooms[roomId]) throw new ServerError("ROOM_NOT_FOUND");
+      // one room at a time: rejoining your own room is fine (that's how a
+      // refresh gets your seat back), a different one isn't
+      const currentRoomId = playerToRoom[playerId];
+      if (
+        currentRoomId &&
+        currentRoomId !== roomId &&
+        rooms[currentRoomId]?.players[playerId]?.active
+      )
+        throw new ServerError(
+          "ALREADY_IN_ROOM",
+          `You're already in room ${currentRoomId}`,
+        );
       if (!rooms[roomId].players[playerId]?.active) {
         rooms[roomId] = addPlayer(
           rooms[roomId],

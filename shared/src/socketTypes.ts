@@ -145,4 +145,5 @@ export type ErrorCode =
   | "GAME_PAUSED"
   | "SEAT_VACANT"
   | "PLAYER_NOT_IN_ROOM"
+  | "ALREADY_IN_ROOM"
   | "UNKNOWN_ERROR";
