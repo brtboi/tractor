@@ -1,20 +1,97 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AnimatePresence } from "framer-motion";
+import { useNavigate, useParams } from "react-router-dom";
 import { useGameSocket } from "../services/useGameSocket";
 import { useRoomActions } from "../services/useRoomActions";
+import { joinRoom } from "../services/gameActions";
+import { loadName } from "../services/playerName";
+import NotFound from "../NotFound/NotFound";
+import notFoundStyles from "../NotFound/NotFound.module.scss";
 import SettingsModal from "./SettingsModal";
 import GameBoard from "./GameBoard";
 import RoundSummary from "./RoundSummary";
 import styles from "./GamePage.module.scss";
 
 export default function GamePage() {
-  const { playerId, gameState } = useGameSocket();
+  const { roomId: urlRoomId = "" } = useParams();
+  const roomCode = urlRoomId.toUpperCase();
+  const navigate = useNavigate();
+  const { playerId, gameState, isRegistered } = useGameSocket();
   const actions = useRoomActions();
   const [isSettingsModalOpen, setIsSettingsModalOpen] =
     useState<boolean>(false);
+  // why joining from the link failed, keyed by room so a new link retries
+  const [joinFailure, setJoinFailure] = useState<{
+    roomCode: string;
+    code: string;
+    error: string;
+  } | null>(null);
 
-  if (!gameState || !gameState.players[playerId]) {
-    return <p>no game state :(</p>;
+  const isInThisRoom =
+    !!gameState &&
+    gameState.roomId === roomCode &&
+    !!gameState.players[playerId];
+  const otherRoomId =
+    gameState && gameState.roomId !== roomCode ? gameState.roomId : null;
+  const failure = joinFailure?.roomCode === roomCode ? joinFailure : null;
+
+  // opened a room link directly (or refreshed): join it. if we're already
+  // seated there the server just hands our seat back.
+  useEffect(() => {
+    if (!isRegistered || isInThisRoom || otherRoomId || !roomCode) return;
+    let cancelled = false;
+    joinRoom(roomCode, loadName()).then((res) => {
+      if (!cancelled && !res.ok)
+        setJoinFailure({ roomCode, code: res.code, error: res.error });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [isRegistered, isInThisRoom, otherRoomId, roomCode]);
+
+  if (failure) {
+    const code = <span className={notFoundStyles.code}>{roomCode}</span>;
+    if (failure.code === "ROOM_NOT_FOUND")
+      return (
+        <NotFound
+          title={<>oops, room {code} doesn't exist</>}
+          message="It may have closed, or the code has a typo."
+        />
+      );
+    return (
+      <NotFound
+        title={<>can't join room {code}</>}
+        message={
+          failure.code === "ROOM_FULL"
+            ? "That table is already full."
+            : failure.code === "GAME_ALREADY_STARTED"
+              ? "That game already started."
+              : failure.error
+        }
+      />
+    );
+  }
+
+  if (otherRoomId) {
+    return (
+      <NotFound
+        title={
+          <>
+            you're already in room{" "}
+            <span className={notFoundStyles.code}>{otherRoomId}</span>
+          </>
+        }
+        message="Leave it first if you want to join a different one."
+        action={{
+          label: "Back to my room",
+          onClick: () => navigate(`/game/${otherRoomId}`, { replace: true }),
+        }}
+      />
+    );
+  }
+
+  if (!gameState || !isInThisRoom) {
+    return <p className={styles.joining}>joining {roomCode}…</p>;
   }
 
   const handleStartTestGame = async () => {

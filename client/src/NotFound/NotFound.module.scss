@@ -1,0 +1,44 @@
+@use "../_variables.scss" as *;
+
+.notFound {
+  min-height: 100vh;
+  width: min(24rem, 100% - 32px);
+  margin: 0 auto;
+
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  text-align: center;
+}
+
+.card {
+  width: 79.5px;
+  image-rendering: pixelated;
+  filter: drop-shadow(0 3px 0 var(--bevel));
+  margin-bottom: 0.5rem;
+}
+
+.title {
+  @include pixel-font;
+  font-size: 2rem;
+  line-height: 1.1;
+  text-shadow: 0 3px 0 var(--bevel);
+
+  .code {
+    color: var(--primary-color);
+  }
+}
+
+.message {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+.homeButton {
+  @include button-primary;
+  height: 2.5rem;
+  padding: 0 1.5rem;
+  margin-top: 0.5rem;
+}

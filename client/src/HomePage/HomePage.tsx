@@ -2,28 +2,12 @@ import React, { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import styles from "./HomePage.module.scss";
 import { createRoom, joinRoom } from "../services/gameActions";
+import { loadName, saveName } from "../services/playerName";
 import { useGameSocket } from "../services/useGameSocket";
 import { useNavigate } from "react-router-dom";
 
-const NAME_KEY = "PLAYER_NAME";
-
 const FAN_CARDS = ["Spades_02", "Hearts_14", "Joker_16", "Joker_15", "Diamonds_02"];
 
-function loadName(): string {
-  try {
-    return localStorage.getItem(NAME_KEY) ?? "";
-  } catch {
-    return "";
-  }
-}
-
-function saveName(name: string): void {
-  try {
-    localStorage.setItem(NAME_KEY, name);
-  } catch {
-    // private mode etc - the name just won't be remembered
-  }
-}
 
 export default function HomePage() {
   const navigate = useNavigate();
