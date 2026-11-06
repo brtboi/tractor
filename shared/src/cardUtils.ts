@@ -297,6 +297,14 @@ function decompositionBeats(
   return true;
 }
 
+/** a sequence's group sizes, order-independent, e.g. [4, 2, 1] -> "1,2,4" */
+function shapeOf(sequence: TrickSequence): string {
+  return sequence
+    .map((group) => group.numCards)
+    .sort((x, y) => x - y)
+    .join(",");
+}
+
 export function compareTricks(
   a: Card[],
   b: Card[],
@@ -315,16 +323,24 @@ export function compareTricks(
   if (!bSuit) return 1;
   if (bSuit !== startSuit && bSuit !== "Joker") return 1;
 
-  // a is non-trump, b is trump: b wins
-  if (aSuit !== "Joker" && bSuit === "Joker") return -1;
+  const aSeq = getTrickSequence(a, trumpSuit, trumpRank);
+  const bSeq = getTrickSequence(b, trumpSuit, trumpRank);
+  const bDecompositions = generateDecompositions(bSeq);
+
+  // a is non-trump, b is trump: b ruffs it, but only with the lead's shape
+  // (a pair for a pair, a tractor for a tractor; a tractor may stand in
+  // for the same number of pairs, but loose cards can't make a pair)
+  if (aSuit !== "Joker" && bSuit === "Joker") {
+    const leadShape = shapeOf(
+      getTrickSequence(startingTrick, trumpSuit, trumpRank),
+    );
+    return bDecompositions.some((d) => shapeOf(d) === leadShape) ? -1 : 1;
+  }
 
   // a is trump, b is not: a wins
   if (aSuit === "Joker" && bSuit !== "Joker") return 1;
 
   // Both same suit: compare by decomposition
-  const aSeq = getTrickSequence(a, trumpSuit, trumpRank);
-  const bSeq = getTrickSequence(b, trumpSuit, trumpRank);
-  const bDecompositions = generateDecompositions(bSeq);
 
   for (const bDecomp of bDecompositions) {
     if (decompositionBeats(bDecomp, aSeq)) return -1; // b wins
