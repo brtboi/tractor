@@ -21,6 +21,8 @@ import {
 } from "./GamePageHelpers";
 import { useFlyIn } from "./useFlyIn";
 import { useBoardCardSize } from "./useViewport";
+import type { ThrowReveal } from "./useThrowReveal";
+import ThrowBanner from "./ThrowBanner";
 import styles from "./GamePage.module.scss";
 
 type Props = {
@@ -29,6 +31,8 @@ type Props = {
   playerId: string;
   // whoever the table is waiting on
   actorId: string | null;
+  // a throw being checked against everyone's hands, if any
+  throwReveal: ThrowReveal | null;
   canDraw: boolean;
   onDrawPile: () => void;
   onCut: (breakAt: number) => Promise<AckResult>;
@@ -83,6 +87,7 @@ export default function TableCenter({
   round,
   playerId,
   actorId,
+  throwReveal,
   canDraw,
   onDrawPile,
   onCut,
@@ -138,37 +143,55 @@ export default function TableCenter({
   return (
     <div className={styles.tableFelt} data-fly-origin="table">
       <div className={styles.tableMiddle}>
-        <div className={styles.statusLine}>
-          <AnimatePresence initial={false}>
-            {actorSeat && round.phase !== "drawing" && (
-              <motion.svg
-                key="pointer"
-                className={styles.turnPointer}
-                viewBox="0 0 7 4"
-                shapeRendering="crispEdges"
-                aria-hidden="true"
-                initial={{ opacity: 0, rotate: pointer.angle }}
-                animate={{ opacity: 1, rotate: pointer.angle }}
-                exit={{ opacity: 0 }}
-                transition={{ type: "spring", stiffness: 220, damping: 22 }}
-              >
-                <path d="M3 0h1v1h1v1h1v1h1v1H0V3h1V2h1V1h1z" />
-              </motion.svg>
-            )}
-          </AnimatePresence>
-          <AnimatePresence mode="wait" initial={false}>
-            <motion.span
-              key={status}
-              className={styles.statusText}
-              initial={{ opacity: 0, y: 6 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -6 }}
-              transition={{ duration: 0.2 }}
+        <AnimatePresence mode="wait" initial={false}>
+          {throwReveal ? (
+            <ThrowBanner
+              key="throw"
+              gameState={gameState}
+              playerId={playerId}
+              reveal={throwReveal}
+            />
+          ) : (
+            <motion.div
+              key="status"
+              className={styles.statusLine}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.15 }}
             >
-              {status}
-            </motion.span>
-          </AnimatePresence>
-        </div>
+              <AnimatePresence initial={false}>
+                {actorSeat && round.phase !== "drawing" && (
+                  <motion.svg
+                    key="pointer"
+                    className={styles.turnPointer}
+                    viewBox="0 0 7 4"
+                    shapeRendering="crispEdges"
+                    aria-hidden="true"
+                    initial={{ opacity: 0, rotate: pointer.angle }}
+                    animate={{ opacity: 1, rotate: pointer.angle }}
+                    exit={{ opacity: 0 }}
+                    transition={{ type: "spring", stiffness: 220, damping: 22 }}
+                  >
+                    <path d="M3 0h1v1h1v1h1v1h1v1H0V3h1V2h1V1h1z" />
+                  </motion.svg>
+                )}
+              </AnimatePresence>
+              <AnimatePresence mode="wait" initial={false}>
+                <motion.span
+                  key={status}
+                  className={styles.statusText}
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -6 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  {status}
+                </motion.span>
+              </AnimatePresence>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         <AnimatePresence mode="popLayout">
           {round.phase === "breaking" && (
@@ -288,12 +311,20 @@ export default function TableCenter({
         {plays.map(({ playerId: trickPlayerId, trick }) => {
           const isWinner =
             isShowingLast && trickPlayerId === round.lastTrickWinner;
+          // while a throw is being checked, the whole attempt sits on the
+          // table; whatever gets bounced leaves at the verdict
+          const cards =
+            !isShowingLast &&
+            throwReveal?.stage === "asking" &&
+            throwReveal.attempt.playerId === trickPlayerId
+              ? throwReveal.attempt.attempted
+              : trick;
           return (
             <TrickGroup
               key={`${trickId}-${trickPlayerId}`}
               trickPlayerId={trickPlayerId}
               seat={seatOf(trickPlayerId)}
-              cards={trick}
+              cards={cards}
               size={cardSize}
               winnerVector={winnerVector}
               isDimmed={isShowingLast && !isWinner}

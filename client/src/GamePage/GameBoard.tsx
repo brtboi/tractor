@@ -13,6 +13,7 @@ import ActionBar, { type ActionDescriptor } from "./ActionBar";
 import OpponentSeat from "./OpponentSeat";
 import Scoreboard from "./Scoreboard";
 import TableCenter from "./TableCenter";
+import { useThrowReveal } from "./useThrowReveal";
 import styles from "./GamePage.module.scss";
 import {
   canCallTrump,
@@ -50,6 +51,7 @@ export default function GameBoard({ isInteractive }: Props) {
   const [sortEnabled, setSortEnabled] = useState(true);
   const [autoDraw, setAutoDraw] = useState(false);
   const [prevPhase, setPrevPhase] = useState(currentRound?.phase);
+  const throwReveal = useThrowReveal(currentRound ?? null);
 
   // stale selections from a previous phase (e.g. someone else's call trump
   // moved us from "drawing" to "bottoming") shouldn't carry over. Resetting
@@ -102,7 +104,15 @@ export default function GameBoard({ isInteractive }: Props) {
     round.phase === "bottoming" && round.bottomPlayer === playerId;
 
   const rawHand = round.hands[playerId] ?? [];
-  const myHand = isBottomingMe ? [...rawHand, ...round.bottom] : rawHand;
+  // while my throw is being checked, the cards I might have to take back
+  // sit on the table with the rest of it
+  const pendingReturn =
+    throwReveal?.stage === "asking" && throwReveal.attempt.playerId === playerId
+      ? throwReveal.returned
+      : [];
+  const myHand = isBottomingMe
+    ? [...rawHand, ...round.bottom]
+    : rawHand.filter((card) => !isCardSelected(card, pendingReturn));
   const displayHand = sortEnabled
     ? sortHand(myHand, getKnownTrumpSuit(round), round.trumpRank)
     : myHand;
@@ -253,6 +263,7 @@ export default function GameBoard({ isInteractive }: Props) {
         round={round}
         playerId={playerId}
         actorId={actorId}
+        throwReveal={throwReveal}
         canDraw={!!isMyDraw}
         onDrawPile={() => runAction(roomActions.drawCard)}
         onCut={roomActions.breakDeck}

@@ -13,17 +13,23 @@ type Props = {
 
 /** a tiny paper badge drawn like the corner index of a card sprite */
 export default function MiniCard({ rank, suit, muted, title }: Props) {
+  const isJoker = suit === "Joker";
   const symbol = suit ? SUIT_SYMBOLS[suit] : "";
+  // big joker is the red one on the sprites
+  const isRed = isJoker ? rank === 16 : !!suit && isRedSuit(suit);
   return (
     <span
       className={clsx(
         styles.miniCard,
-        suit && isRedSuit(suit) && styles.red,
+        isRed && styles.red,
         muted && styles.mutedCard,
       )}
-      title={title}
+      title={
+        title ??
+        (isJoker ? (rank === 16 ? "big joker" : "small joker") : undefined)
+      }
     >
-      <span>{levelLabel(rank)}</span>
+      <span>{isJoker ? (rank === 16 ? "BJ" : "SJ") : levelLabel(rank)}</span>
       {symbol && <span className={styles.miniSuit}>{symbol}</span>}
     </span>
   );

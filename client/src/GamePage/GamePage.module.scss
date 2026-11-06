@@ -860,6 +860,104 @@ $card-h: 75px;
   font-size: 1rem;
 }
 
+// "can I play this": the table being asked whether a throw stands
+.throwBanner {
+  position: relative;
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 15rem;
+  padding: 0.7rem 1.1rem 0.75rem;
+
+  border: 1px solid var(--border-strong);
+  border-radius: $border-radius-md;
+  background: rgba(15, 17, 36, 0.92);
+  box-shadow:
+    $bevel,
+    0 10px 30px rgba(4, 5, 16, 0.45);
+  transition:
+    border-color 0.2s,
+    background-color 0.2s;
+
+  &.stands {
+    border-color: var(--primary-border);
+  }
+
+  &.denied {
+    border-color: rgba(201, 103, 125, 0.6);
+  }
+}
+
+.throwTitle {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  @include pixel-font;
+  font-size: 1.25rem;
+  white-space: nowrap;
+
+  .stands & {
+    color: var(--primary-color);
+  }
+
+  .denied & {
+    color: var(--team-b);
+  }
+}
+
+.throwMark {
+  font-family: var(--font-main);
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+.throwCards {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.throwDetail {
+  display: flex;
+  align-items: baseline;
+  gap: 0.3rem;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+
+// three pixels lighting up one after another, like someone checking
+.askingDots {
+  display: inline-flex;
+  gap: 3px;
+
+  i {
+    @include pixel-dot(4px, var(--primary-color));
+    opacity: 0.2;
+    animation: askingDot 1.2s steps(1) infinite;
+
+    &:nth-child(2) {
+      animation-delay: 0.2s;
+    }
+
+    &:nth-child(3) {
+      animation-delay: 0.4s;
+    }
+  }
+}
+
+@keyframes askingDot {
+  0%,
+  60%,
+  100% {
+    opacity: 0.2;
+  }
+  20%,
+  40% {
+    opacity: 1;
+  }
+}
+
 // ---- overlays: round summary + settings ----
 
 .overlay {
