@@ -1,0 +1,7 @@
+{
+  "watch": ["src", "../shared/dist"],
+  "ext": "ts,js,json",
+  "delay": 400,
+  "env": { "TRACTOR_DEV_ROOMS": "1" },
+  "exec": "node --import ./register-ts-node.js src/server.ts"
+}

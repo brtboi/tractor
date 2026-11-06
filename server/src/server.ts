@@ -35,6 +35,7 @@ import {
   nextRound,
 } from "./gameState.js";
 import { getGhostMove } from "./ghostBot.js";
+import { loadDevRooms, saveDevRooms } from "./devRooms.js";
 
 const app = express();
 const httpServer = createServer(app);
@@ -47,8 +48,9 @@ const io = new Server<
   cors: { origin: "*" },
 });
 
-const rooms: Record<string, GameState> = {};
-const playerToRoom: Record<string, string> = {};
+const devRooms = loadDevRooms();
+const rooms: Record<string, GameState> = devRooms?.rooms ?? {};
+const playerToRoom: Record<string, string> = devRooms?.playerToRoom ?? {};
 
 function getPlayerId(
   socket: Socket<
@@ -74,6 +76,7 @@ function broadcastState(roomId: string) {
     io.to(player.id).emit("GAME_STATE", stateForPlayer(state, player.id));
   });
   scheduleGhostMove(roomId);
+  saveDevRooms({ rooms, playerToRoom });
 }
 
 const ghostTimers: Record<string, ReturnType<typeof setTimeout>> = {};
@@ -444,6 +447,13 @@ io.on("connection", (socket) => {
   });
 });
 
-httpServer.listen(3000, () =>
-  console.log("Server running on http://localhost:3000"),
+if (devRooms) {
+  // restored rooms: pick up any ghost that was mid-turn
+  Object.keys(rooms).forEach(scheduleGhostMove);
+  console.log(`restored ${Object.keys(rooms).length} dev room(s)`);
+}
+
+const PORT = Number(process.env.PORT ?? 3000);
+httpServer.listen(PORT, () =>
+  console.log(`Server running on http://localhost:${PORT}`),
 );
