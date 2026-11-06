@@ -35,10 +35,23 @@ export default function GamePage() {
     gameState && gameState.roomId !== roomCode ? gameState.roomId : null;
   const failure = joinFailure?.roomCode === roomCode ? joinFailure : null;
 
+  // remember once we've been seated here, so losing the room afterwards
+  // (leaving, getting removed) doesn't count as "opened a link to it"
+  const [seatedIn, setSeatedIn] = useState<string | null>(null);
+  if (isInThisRoom && seatedIn !== roomCode) setSeatedIn(roomCode);
+  const hasBeenSeated = seatedIn === roomCode;
+
   // opened a room link directly (or refreshed): join it. if we're already
   // seated there the server just hands our seat back.
   useEffect(() => {
-    if (!isRegistered || isInThisRoom || otherRoomId || !roomCode) return;
+    if (
+      !isRegistered ||
+      isInThisRoom ||
+      hasBeenSeated ||
+      otherRoomId ||
+      !roomCode
+    )
+      return;
     let cancelled = false;
     joinRoom(roomCode, loadName()).then((res) => {
       if (!cancelled && !res.ok)
@@ -47,7 +60,7 @@ export default function GamePage() {
     return () => {
       cancelled = true;
     };
-  }, [isRegistered, isInThisRoom, otherRoomId, roomCode]);
+  }, [isRegistered, isInThisRoom, hasBeenSeated, otherRoomId, roomCode]);
 
   if (failure) {
     const code = <span className={notFoundStyles.code}>{roomCode}</span>;
@@ -91,6 +104,8 @@ export default function GamePage() {
   }
 
   if (!gameState || !isInThisRoom) {
+    // just left: we're on our way home, nothing to show
+    if (hasBeenSeated) return null;
     return <p className={styles.joining}>joining {roomCode}…</p>;
   }
 
