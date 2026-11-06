@@ -162,66 +162,14 @@ function getTrickSuit(
  * @example [22 33 44 77 A] -> [{numCards: 6, highestRank: 4}, {numCards: 2, highestRank: 7}, {numCards: 1, highestRank: 14}]
  */
 function getTrickSequence(
-  unsortedTrick: Card[],
+  trick: Card[],
   trumpSuit: Suit,
   trumpRank: number,
 ): TrickSequence {
-  if (!getTrickSuit(unsortedTrick, trumpSuit, trumpRank)) return [];
-
-  // tricks arrive in whatever order the cards were selected; sort by
-  // canonical rank (then suit, so identical cards sit next to each other)
-  const trick = [...unsortedTrick].sort(
-    (a, b) =>
-      getCanonicalRank(a, trumpSuit, trumpRank) -
-        getCanonicalRank(b, trumpSuit, trumpRank) ||
-      a.suit.localeCompare(b.suit),
+  if (!getTrickSuit(trick, trumpSuit, trumpRank)) return [];
+  return decomposeTrick(trick, trumpSuit, trumpRank).map(
+    ({ numCards, highestRank }) => ({ numCards, highestRank }),
   );
-
-  const degreeSequence: TrickSequence = [];
-  let i = 0;
-  while (i < trick.length) {
-    const currentRank = getCanonicalRank(trick[i], trumpSuit, trumpRank);
-
-    if (
-      i + 1 >= trick.length ||
-      getCanonicalRank(trick[i + 1], trumpSuit, trumpRank) !== currentRank
-    ) {
-      degreeSequence.push({
-        numCards: 1,
-        highestRank: currentRank,
-      });
-
-      i++;
-    } else {
-      let numConsecutivePairs = 1;
-      while (
-        // need both cards of the next pair, not just the first
-        i + 2 * numConsecutivePairs + 1 < trick.length &&
-        getCanonicalRank(
-          trick[i + 2 * numConsecutivePairs],
-          trumpSuit,
-          trumpRank,
-        ) ===
-          currentRank + 1 &&
-        getCanonicalRank(
-          trick[i + 2 * numConsecutivePairs + 1],
-          trumpSuit,
-          trumpRank,
-        ) ===
-          currentRank + 1
-      ) {
-        numConsecutivePairs++;
-      }
-
-      degreeSequence.push({
-        numCards: 2 * numConsecutivePairs,
-        highestRank: currentRank + numConsecutivePairs - 1,
-      });
-
-      i += 2 * numConsecutivePairs;
-    }
-  }
-  return degreeSequence;
 }
 
 /**
@@ -455,4 +403,201 @@ export function getPlayError(
     return `play your ${suitName} pair${pairsNeeded === 1 ? "" : "s"}`;
 
   return null;
+}
+
+// ---- throws ("can I play this") ----
+
+/** one piece of a lead: a single, a pair, or a tractor of consecutive pairs */
+export type TrickPart = {
+  cards: Card[];
+  numCards: number;
+  // canonical rank of the part's top card
+  highestRank: number;
+};
+
+const isSameFace = (a: Card, b: Card) => a.suit === b.suit && a.rank === b.rank;
+
+/**
+ * Splits cards of one effective suit into tractors, pairs and singles,
+ * lowest first. Pairs are two identical cards (so two off-suit trump-rank
+ * cards of different suits are not a pair), and tractors are pairs of
+ * consecutive canonical rank.
+ * @example 33 44 7 K -> [3344, 7, K]
+ */
+export function decomposeTrick(
+  cards: Card[],
+  trumpSuit: Suit,
+  trumpRank: number,
+): TrickPart[] {
+  const rankOf = (card: Card) => getCanonicalRank(card, trumpSuit, trumpRank);
+  const sorted = [...cards].sort(
+    (a, b) => rankOf(a) - rankOf(b) || a.suit.localeCompare(b.suit),
+  );
+
+  const pairs: Card[][] = [];
+  const parts: TrickPart[] = [];
+  for (let i = 0; i < sorted.length;) {
+    if (i + 1 < sorted.length && isSameFace(sorted[i], sorted[i + 1])) {
+      pairs.push([sorted[i], sorted[i + 1]]);
+      i += 2;
+    } else {
+      parts.push({
+        cards: [sorted[i]],
+        numCards: 1,
+        highestRank: rankOf(sorted[i]),
+      });
+      i++;
+    }
+  }
+
+  // chain pairs into tractors, starting from the lowest pair left each time
+  while (pairs.length > 0) {
+    const run = [pairs.shift()!];
+    for (;;) {
+      const nextRank = rankOf(run[run.length - 1][0]) + 1;
+      const idx = pairs.findIndex((pair) => rankOf(pair[0]) === nextRank);
+      if (idx === -1) break;
+      run.push(...pairs.splice(idx, 1));
+    }
+    parts.push({
+      cards: run.flat(),
+      numCards: run.length * 2,
+      highestRank: rankOf(run[run.length - 1][0]),
+    });
+  }
+
+  return parts.sort((a, b) => a.highestRank - b.highestRank);
+}
+
+/** a lead that isn't a single, a pair or one tractor */
+export function isThrow(
+  cards: Card[],
+  trumpSuit: Suit,
+  trumpRank: number,
+): boolean {
+  return decomposeTrick(cards, trumpSuit, trumpRank).length > 1;
+}
+
+/**
+ * whether `hand` could beat `part` within `suit`: a higher single beats a
+ * single, a higher pair beats a pair, and a higher tractor of the same
+ * length beats a tractor
+ */
+function canBeatPart(
+  part: TrickPart,
+  hand: Card[],
+  suit: Suit,
+  trumpSuit: Suit,
+  trumpRank: number,
+): boolean {
+  const rankOf = (card: Card) => getCanonicalRank(card, trumpSuit, trumpRank);
+  const inSuit = hand.filter(
+    (card) => getEffectiveSuit(card, trumpSuit, trumpRank) === suit,
+  );
+
+  if (part.numCards === 1)
+    return inSuit.some((card) => rankOf(card) > part.highestRank);
+
+  // canonical ranks this hand holds an identical pair at
+  const counts = new Map<string, number>();
+  const pairRanks = new Set<number>();
+  for (const card of inSuit) {
+    const key = `${card.suit}-${card.rank}`;
+    const count = (counts.get(key) ?? 0) + 1;
+    counts.set(key, count);
+    if (count === 2) pairRanks.add(rankOf(card));
+  }
+
+  // a tractor of `length` pairs topping out above the part's top
+  const length = part.numCards / 2;
+  for (const top of pairRanks) {
+    if (top <= part.highestRank) continue;
+    let isRun = true;
+    for (let k = 1; k < length && isRun; k++) isRun = pairRanks.has(top - k);
+    if (isRun) return true;
+  }
+  return false;
+}
+
+export type ThrowCheck = {
+  // the part the thrower is held to
+  forced: Card[];
+  // first player (in the order given) who can beat that part
+  beatenBy: string;
+};
+
+/**
+ * Checks a throw against everyone else's hands. Returns null if nobody can
+ * beat any part of it (it stands). Otherwise the thrower only plays the
+ * beatable part with the most cards (the lowest of those on a tie) and
+ * takes the rest back.
+ * @param otherHands everyone but the thrower, in turn order
+ */
+export function checkThrow(
+  trick: Card[],
+  otherHands: { playerId: string; hand: Card[] }[],
+  trumpSuit: Suit,
+  trumpRank: number,
+): ThrowCheck | null {
+  const parts = decomposeTrick(trick, trumpSuit, trumpRank);
+  if (parts.length <= 1) return null;
+  const suit = getEffectiveSuit(trick[0], trumpSuit, trumpRank);
+
+  let best: { part: TrickPart; beatenBy: string } | null = null;
+  for (const part of parts) {
+    const beater = otherHands.find(({ hand }) =>
+      canBeatPart(part, hand, suit, trumpSuit, trumpRank),
+    );
+    if (!beater) continue;
+    if (
+      !best ||
+      part.numCards > best.part.numCards ||
+      (part.numCards === best.part.numCards &&
+        part.highestRank < best.part.highestRank)
+    )
+      best = { part, beatenBy: beater.playerId };
+  }
+
+  return best && { forced: best.part.cards, beatenBy: best.beatenBy };
+}
+
+/**
+ * True if no unseen card could beat any part of the throw, judging only by
+ * `knownCards` (the thrower's hand, cards already played, etc). AAK or KKA
+ * off-suit with two decks always is.
+ */
+export function isThrowGuaranteed(
+  trick: Card[],
+  knownCards: Card[],
+  trumpSuit: Suit,
+  trumpRank: number,
+  numDecks: number = 2,
+): boolean {
+  // every card not accounted for, lumped into one pretend hand (this can
+  // only overestimate what others could beat, so it errs toward asking)
+  const known = new Map<string, number>();
+  for (const card of knownCards) {
+    const key = `${card.suit}-${card.rank}`;
+    known.set(key, (known.get(key) ?? 0) + 1);
+  }
+  const unseen: Card[] = [];
+  const faces: Pick<Card, "suit" | "rank">[] = [];
+  for (const suit of ["Spades", "Hearts", "Diamonds", "Clubs"] as const)
+    for (let rank = 2; rank <= 14; rank++)
+      faces.push({ suit, rank: rank as Card["rank"] });
+  faces.push({ suit: "Joker", rank: 15 }, { suit: "Joker", rank: 16 });
+  for (const face of faces) {
+    const key = `${face.suit}-${face.rank}`;
+    for (let deck = known.get(key) ?? 0; deck < numDecks; deck++)
+      unseen.push({ ...face, deck });
+  }
+
+  return (
+    checkThrow(
+      trick,
+      [{ playerId: "", hand: unseen }],
+      trumpSuit,
+      trumpRank,
+    ) === null
+  );
 }

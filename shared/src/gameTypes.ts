@@ -47,6 +47,16 @@ export type RoundPhase =
   | "asking"
   | "playing";
 
+export type ThrowAttempt = {
+  playerId: string;
+  // everything the thrower tried to lead
+  attempted: Card[];
+  // what actually went down (all of attempted if nobody could beat it)
+  played: Card[];
+  // who could beat the forced part, null if the throw stood
+  beatenBy: string | null;
+};
+
 export type RoundState = {
   phase: RoundPhase;
   onTeam: number; // index in gameState.teams
@@ -65,6 +75,9 @@ export type RoundState = {
   // currentTricks is cleared
   lastTrick: { playerId: string; trick: Card[] }[];
   lastTrickWinner: string | null;
+  // the current trick's lead, if it was a throw that had to be checked
+  // against everyone's hands (null for plain leads and guaranteed throws)
+  lastThrow?: ThrowAttempt | null;
 
   drawPile: Card[];
   hands: Record<string, Card[]>; // player ID -> hand
